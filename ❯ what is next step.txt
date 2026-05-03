@@ -1,0 +1,73 @@
+❯ what is next step?
+
+● The frontend is complete — all screens, mock data, and real API integration are done. The natural next step is building
+  the FastAPI backend.
+
+  The frontend is already calling these endpoints and expecting exact response shapes per 05_api_spec.md:
+  - POST /incidents/analyze-metadata — Gemini log analysis
+  - POST /incidents — create + full AI analysis
+  - GET /incidents, GET /incidents/{id} — read
+  - PATCH /incidents/{id}, PATCH /incidents/{id}/resolve — mutations
+  - PATCH /checklist/{item_id}, PUT /incidents/{id}/note — workspace ops
+  - GET /archive — closed/resolved list
+
+  The backend work breaks into three phases: database models + migrations (from 06_database_schema.md), FastAPI route
+  handlers with JWT auth (from 07_auth_spec.md + 09_backend_arch.md), and Gemini integration for the AI endpoints.
+
+  Want to start on the backend?
+
+✻ Baked for 13s
+
+❯ how can I test this app with backend?
+
+● Run the app with two --dart-define flags that override the compile-time constants:
+
+  flutter run \
+    --dart-define=USE_MOCK_DATA=false \
+    --dart-define=API_BASE_URL=http://localhost:8000
+
+  That's all that's needed. AppConfig.useMockData becomes false, which causes incident_module.dart to provide
+  IncidentApiDatasource (real Dio) instead of the mock, and auth stays on Supabase (it was never mocked for real mode).
+
+  For other environments:
+
+  ┌────────────────────────────────────┬─────────────────────────────────────────────────┐
+  │               Target               │                  API_BASE_URL                   │
+  ├────────────────────────────────────┼─────────────────────────────────────────────────┤
+  │ Local backend                      │ http://localhost:8000                           │
+  ├────────────────────────────────────┼─────────────────────────────────────────────────┤
+  │ Local on device (Android emulator) │ http://10.0.2.2:8000                            │
+  ├────────────────────────────────────┼─────────────────────────────────────────────────┤
+  │ Local on physical device           │ http://192.168.x.x:8000 (your machine's LAN IP) │
+  ├────────────────────────────────────┼─────────────────────────────────────────────────┤
+  │ Staging/prod                       │ https://api.yourapp.com                         │
+  └────────────────────────────────────┴─────────────────────────────────────────────────┘
+
+  VS Code — add a launch configuration to .vscode/launch.json so you don't have to type it every time:
+
+  {
+    "configurations": [
+      {
+        "name": "Sentinel (mock)",
+        "request": "launch",
+        "type": "dart"
+      },
+      {
+        "name": "Sentinel (real backend)",
+        "request": "launch",
+        "type": "dart",
+        "toolArgs": [
+          "--dart-define=USE_MOCK_DATA=false",
+          "--dart-define=API_BASE_URL=http://localhost:8000"
+        ]
+      }
+    ]
+  }
+
+  You also need the Supabase env vars populated in your Flutter app (the SUPABASE_URL and SUPABASE_ANON_KEY passed at init
+  time) — check wherever Supabase.initialize(...) is called in main.dart.
+
+✻ Cooked for 10s
+
+※ recap: Building a Flutter incident management app called Sentinel. Frontend is complete with mock data and real API
+  integration. Next step is building the FastAPI backend.

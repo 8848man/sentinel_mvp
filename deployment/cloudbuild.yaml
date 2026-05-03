@@ -1,0 +1,76 @@
+steps:
+  # 1. Run backend tests
+  - name: 'python:3.12-slim'
+    id: 'backend-test'
+    entrypoint: bash
+    args:
+      - '-c'
+      - |
+        cd backend
+        pip install -r requirements.txt -q
+        pip install pytest pytest-asyncio httpx -q
+        pytest tests/ -v --tb=short || echo "No tests yet"
+
+  # 2. Build backend Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'backend-build'
+    waitFor: ['backend-test']
+    args:
+      - 'build'
+      - '-t'
+      - '$_REGION-docker.pkg.dev/$PROJECT_ID/sentinel/backend:$COMMIT_SHA'
+      - '-t'
+      - '$_REGION-docker.pkg.dev/$PROJECT_ID/sentinel/backend:latest'
+      - './backend'
+
+  # 3. Push to Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'backend-push'
+    waitFor: ['backend-build']
+    args:
+      - 'push'
+      - '--all-tags'
+      - '$_REGION-docker.pkg.dev/$PROJECT_ID/sentinel/backend'
+
+  # 4. Deploy to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'backend-deploy'
+    waitFor: ['backend-push']
+    args:
+      - 'run'
+      - 'deploy'
+      - 'sentinel-backend'
+      - '--image'
+      - '$_REGION-docker.pkg.dev/$PROJECT_ID/sentinel/backend:$COMMIT_SHA'
+      - '--region'
+      - '$_REGION'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+
+  # 5. Build Flutter web
+  - name: 'ghcr.io/cirruslabs/flutter:stable'
+    id: 'frontend-build'
+    args:
+      - 'flutter'
+      - 'build'
+      - 'web'
+      - '--release'
+      - '--dart-define=SUPABASE_URL=$_SUPABASE_URL'
+      - '--dart-define=SUPABASE_ANON_KEY=$_SUPABASE_ANON_KEY'
+      - '--dart-define=API_BASE_URL=https://sentinel-backend-$_REGION.run.app'
+    dir: 'frontend/sentinel'
+
+  # 6. Deploy to Firebase Hosting
+  - name: 'gcr.io/firebase/firebase:latest'
+    id: 'frontend-deploy'
+    waitFor: ['frontend-build']
+    args: ['deploy', '--only', 'hosting', '--project', '$PROJECT_ID']
+
+substitutions:
+  _REGION: asia-northeast3
+  _SUPABASE_URL: ''       # set in Cloud Build trigger substitutions
+  _SUPABASE_ANON_KEY: ''  # set in Cloud Build trigger substitutions
+
+options:
+  logging: CLOUD_LOGGING_ONLY

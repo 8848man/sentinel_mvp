@@ -1,0 +1,1 @@
+enum DashboardViewMode { status, severity }
