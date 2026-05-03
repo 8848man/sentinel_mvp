@@ -81,6 +81,36 @@ class AuthNotifier extends Notifier<AuthState> {
     }
   }
 
+  /// Dev-only direct registration that bypasses email verification.
+  /// Active when AppConfig.skipEmailVerification is true.
+  /// In real-Supabase mode the project must have email confirmation disabled.
+  Future<void> registerDirect(String email, String password) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      if (AppConfig.useMockData) {
+        await _mockDatasource.registerDirect(email, password);
+      } else {
+        final response = await Supabase.instance.client.auth.signUp(
+          email: email.trim(),
+          password: password,
+        );
+        // signUp returns a session only when Supabase email confirmation is disabled.
+        if (response.session == null) {
+          throw Exception(
+            'Email confirmation is still enabled in Supabase. '
+            'Disable it under Authentication → Providers → Email in the Supabase dashboard.',
+          );
+        }
+      }
+      state = state.copyWith(isLoading: false, status: AuthStatus.authenticated);
+    } on AuthException catch (e) {
+      state = state.copyWith(isLoading: false, error: e.message);
+    } catch (e) {
+      state = state.copyWith(
+          isLoading: false, error: e.toString().replaceAll('Exception: ', ''));
+    }
+  }
+
   /// Step 1: create account and trigger OTP email.
   Future<void> sendSignUpCode(String email, String password) async {
     state = state.copyWith(isLoading: true, error: null);

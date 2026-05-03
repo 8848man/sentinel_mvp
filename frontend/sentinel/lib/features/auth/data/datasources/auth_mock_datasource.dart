@@ -17,6 +17,9 @@ class AuthMockDatasource {
   // Tracks pending sign-ups: email → password (waiting for OTP verification)
   final Map<String, String> _pendingSignUps = {};
 
+  // Tracks users registered via the dev direct-registration flow
+  final Map<String, String> _directRegistrations = {};
+
   Future<MockAuthResult> signIn(String email, String password) async {
     await Future.delayed(const Duration(milliseconds: 600));
 
@@ -36,6 +39,28 @@ class AuthMockDatasource {
       email: account.email,
       accessToken: account.accessToken,
       refreshToken: account.refreshToken,
+    );
+  }
+
+  /// Dev-only direct registration without OTP verification.
+  Future<MockAuthResult> registerDirect(String email, String password) async {
+    await Future.delayed(const Duration(milliseconds: 400));
+
+    final normalized = email.trim().toLowerCase();
+
+    final isDuplicate = kMockAuthAccounts.any((a) => a.email == normalized) ||
+        _directRegistrations.containsKey(normalized);
+    if (isDuplicate) {
+      throw Exception('An account with this email already exists.');
+    }
+
+    _directRegistrations[normalized] = password;
+
+    return MockAuthResult(
+      userId: 'mock-user-${DateTime.now().millisecondsSinceEpoch}',
+      email: normalized,
+      accessToken: 'mock.access.$normalized',
+      refreshToken: 'mock.refresh.$normalized',
     );
   }
 
