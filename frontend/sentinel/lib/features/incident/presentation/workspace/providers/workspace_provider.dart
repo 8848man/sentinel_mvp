@@ -162,6 +162,7 @@ class WorkspaceNotifier extends FamilyNotifier<WorkspaceState, String> {
       final useCase = ref.read(resolveIncidentUseCaseProvider);
       await useCase(arg);
       state = state.copyWith(isResolving: false, navigateToDashboard: true);
+      ref.read(incidentListStampProvider.notifier).state++;
     } catch (_) {
       state = state.copyWith(
           isResolving: false, error: 'Failed to resolve incident.');
