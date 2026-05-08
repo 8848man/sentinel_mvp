@@ -34,10 +34,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     setState(() => _validationError = null);
 
     await ref.read(authProvider.notifier).signIn(email, password);
-
-    if (mounted && ref.read(authProvider).isAuthenticated) {
-      context.go('/dashboard');
-    }
   }
 
   @override

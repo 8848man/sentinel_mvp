@@ -4,7 +4,10 @@ import '../../../incident/domain/entities/incident.dart';
 
 class ArchiveNotifier extends AsyncNotifier<List<Incident>> {
   @override
-  Future<List<Incident>> build() => _fetch();
+  Future<List<Incident>> build() {
+    ref.listen<int>(incidentListStampProvider, (_, __) => reload());
+    return _fetch();
+  }
 
   Future<List<Incident>> _fetch() async {
     final useCase = ref.read(getArchiveIncidentsUseCaseProvider);

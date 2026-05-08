@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import '../../../../core/config/app_config.dart';
 import '../../../../design_system/design_system.dart';
 import '../providers/auth_provider.dart';
@@ -45,10 +44,6 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     if (email.isEmpty || password.isEmpty) return;
 
     await ref.read(authProvider.notifier).registerDirect(email, password);
-
-    if (mounted && ref.read(authProvider).isAuthenticated) {
-      context.go('/dashboard');
-    }
   }
 
   // ── Production mode (skipEmailVerification == false) ──────────────────────
@@ -72,10 +67,6 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     if (email.isEmpty || code.isEmpty) return;
 
     await ref.read(authProvider.notifier).verifySignUp(email, code);
-
-    if (mounted && ref.read(authProvider).isAuthenticated) {
-      context.go('/dashboard');
-    }
   }
 
   void _showSnack(String message) {

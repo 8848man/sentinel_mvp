@@ -93,6 +93,7 @@ class RegistrationFormNotifier extends Notifier<RegistrationFormState> {
         components: List.from(state.components),
       );
       state = state.copyWith(isSubmitting: false, createdIncidentId: incident.id);
+      ref.read(incidentListStampProvider.notifier).state++;
     } catch (e) {
       state = state.copyWith(
         isSubmitting: false,
