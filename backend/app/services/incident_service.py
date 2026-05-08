@@ -95,8 +95,8 @@ async def get_incident_detail(incident_id: str, user_id: str, db: AsyncSession) 
         select(Incident)
         .options(
             selectinload(Incident.fix_flows).selectinload(FixFlow.checklist_items),
-            selectinload(Incident.timeline_events),
-            selectinload(Incident.similar_incidents),
+            selectinload(Incident.timeline),
+            selectinload(Incident.similar_incidents).selectinload(SimilarIncident.similar_to),
             selectinload(Incident.note),
         )
         .where(Incident.id == incident_id)
@@ -115,8 +115,9 @@ async def patch_incident(incident_id: str, body: IncidentPatchRequest, user_id: 
     async with db.begin():
         incident = await _get_owned(incident_id, user_id, db)
         if body.selected_fix_flow_id:
-            incident.selected_fix_flow_id = body.selected_fix_flow_id
-            flow = await db.get(FixFlow, body.selected_fix_flow_id)
+            fix_flow_id = str(body.selected_fix_flow_id)  # UUID → str for SQLite binding
+            incident.selected_fix_flow_id = fix_flow_id
+            flow = await db.get(FixFlow, fix_flow_id)
             if flow:
                 db.add(TimelineEvent(incident_id=incident.id, event=f"Fix Flow attached: {flow.title}"))
         if body.status:

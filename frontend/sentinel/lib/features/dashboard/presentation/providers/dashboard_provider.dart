@@ -97,7 +97,7 @@ class DashboardNotifier extends Notifier<DashboardState> {
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
-        error: 'Failed to load incidents. Pull to refresh.',
+        error: kDebugMode ? e.toString() : 'Failed to load incidents.',
       );
     }
   }

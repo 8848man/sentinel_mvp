@@ -1,5 +1,5 @@
-from pydantic import BaseModel, Field
-from typing import Literal
+from pydantic import BaseModel, Field, model_validator
+from typing import Any, Literal
 from datetime import datetime
 from uuid import UUID
 
@@ -31,6 +31,7 @@ class ChecklistItemResponse(BaseModel):
     step_number: int
     description: str
     is_completed: bool
+    updated_at: datetime
 
     class Config:
         from_attributes = True
@@ -57,9 +58,34 @@ class TimelineEventResponse(BaseModel):
 
 
 class SimilarIncidentResponse(BaseModel):
-    incident_id: UUID
+    """
+    Represents a resolved incident that is similar to the current one.
+
+    Source is a SimilarIncident ORM row. The ORM has:
+      - similar_to_id  → the ID of the referenced incident  (→ incident_id here)
+      - similar_to     → the full Incident object            (→ incident_code here)
+      - match_score    → similarity score
+
+    The model_validator runs before field validation so we can remap ORM
+    attributes to the expected response shape without any field aliasing.
+    """
+
+    incident_id: str
     incident_code: str
     match_score: float
+
+    @model_validator(mode="before")
+    @classmethod
+    def _from_orm(cls, v: Any) -> Any:
+        # When coming from an ORM SimilarIncident object, remap to the expected dict.
+        if hasattr(v, "similar_to_id"):
+            similar_to = v.similar_to  # must be eagerly loaded via selectinload
+            return {
+                "incident_id": str(v.similar_to_id),
+                "incident_code": similar_to.incident_code if similar_to else "",
+                "match_score": float(v.match_score),
+            }
+        return v
 
 
 class NoteResponse(BaseModel):

@@ -10,6 +10,8 @@ class Settings(BaseSettings):
     GEMINI_MODEL: str = "gemini-2.0-flash"
     GEMINI_TIMEOUT_SECONDS: int = 15
     ALLOWED_ORIGINS: list[str] = ["http://localhost:3000", "http://localhost:5173"]
+    # Set to False in production to enforce full email verification on sign-up.
+    SKIP_EMAIL_VERIFICATION: bool = True
 
     @property
     def resolved_database_url(self) -> str:

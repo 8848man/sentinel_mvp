@@ -1,6 +1,6 @@
 """SQLAlchemy ORM models. Must match sdd/06_database_schema.md exactly."""
 from datetime import datetime, timezone
-from uuid import uuid4
+from uuid import uuid4, uuid5, NAMESPACE_URL
 from sqlalchemy import String, Text, Numeric, Boolean, SmallInteger, JSON, ForeignKey, UniqueConstraint, TypeDecorator
 from sqlalchemy.dialects.postgresql import ARRAY as PG_ARRAY
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -13,6 +13,11 @@ def _uuid():
 
 def _now():
     return datetime.now(timezone.utc)
+
+
+def _user_id_for(email: str) -> str:
+    """Deterministic UUID5 so the same email always maps to the same user_id."""
+    return str(uuid5(NAMESPACE_URL, f"sentinel-local-user:{email.strip().lower()}"))
 
 
 class TextListType(TypeDecorator):
@@ -38,6 +43,14 @@ class IncidentSequence(Base):
     next_seq: Mapped[int] = mapped_column(default=1)
 
 
+class User(Base):
+    __tablename__ = "users"
+    user_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
+    password: Mapped[str] = mapped_column(String(255), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(default=_now)
+
+
 class Incident(Base):
     __tablename__ = "incidents"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
@@ -60,7 +73,7 @@ class Incident(Base):
     updated_at: Mapped[datetime] = mapped_column(default=_now, onupdate=_now)
 
     fix_flows: Mapped[list["FixFlow"]] = relationship("FixFlow", foreign_keys="FixFlow.incident_id", back_populates="incident", cascade="all, delete-orphan")
-    timeline_events: Mapped[list["TimelineEvent"]] = relationship(back_populates="incident", cascade="all, delete-orphan", order_by="TimelineEvent.occurred_at")
+    timeline: Mapped[list["TimelineEvent"]] = relationship(back_populates="incident", cascade="all, delete-orphan", order_by="TimelineEvent.occurred_at")
     similar_incidents: Mapped[list["SimilarIncident"]] = relationship(foreign_keys="SimilarIncident.incident_id", back_populates="incident", cascade="all, delete-orphan")
     note: Mapped["Note | None"] = relationship(back_populates="incident", cascade="all, delete-orphan", uselist=False)
 
@@ -108,7 +121,7 @@ class TimelineEvent(Base):
     event: Mapped[str] = mapped_column(Text, nullable=False)
     occurred_at: Mapped[datetime] = mapped_column(default=_now)
 
-    incident: Mapped["Incident"] = relationship(back_populates="timeline_events")
+    incident: Mapped["Incident"] = relationship(back_populates="timeline")
 
 
 class SimilarIncident(Base):
