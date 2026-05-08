@@ -93,10 +93,10 @@ class RegistrationFormNotifier extends Notifier<RegistrationFormState> {
         components: List.from(state.components),
       );
       state = state.copyWith(isSubmitting: false, createdIncidentId: incident.id);
-    } catch (_) {
+    } catch (e) {
       state = state.copyWith(
         isSubmitting: false,
-        submitError: 'Failed to create incident. Please try again.',
+        submitError: kDebugMode ? e.toString() : 'Failed to create incident. Please try again.',
       );
     }
   }

@@ -1,18 +1,17 @@
 import time
-import uuid
 
 import jwt
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.auth import get_current_user
 from app.core.config import settings
+from app.core.database import get_db
+from app.models.models import User, _user_id_for
 
 router = APIRouter(prefix="/auth", tags=["auth"])
-
-# In-memory user store for local backend auth mode.
-# Populated by /register, consumed by /login.
-# Passwords are stored in plain text — acceptable for ephemeral dev-only state.
-_user_store: dict[str, dict] = {}
 
 
 class RegisterRequest(BaseModel):
@@ -70,13 +69,7 @@ def _issue_token(user_id: str, email: str) -> str:
     status_code=status.HTTP_201_CREATED,
     summary="Dev-only direct registration (email verification bypassed)",
 )
-async def dev_register(body: RegisterRequest) -> RegisterResponse:
-    """
-    Creates a local user account without email verification.
-
-    Gated behind SKIP_EMAIL_VERIFICATION=true (dev default). Returns 403 in production.
-    The registered account is held in memory and can be used immediately with /login.
-    """
+async def dev_register(body: RegisterRequest, db: AsyncSession = Depends(get_db)) -> RegisterResponse:
     _require_dev()
     email = _validated_email(body.email)
     if len(body.password) < 8:
@@ -84,12 +77,14 @@ async def dev_register(body: RegisterRequest) -> RegisterResponse:
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Password must be at least 8 characters.",
         )
-    if email in _user_store:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="An account with this email already exists.",
-        )
-    _user_store[email] = {"user_id": f"local-{uuid.uuid4()}", "password": body.password}
+    async with db.begin():
+        existing = await db.scalar(select(User).where(User.email == email))
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="An account with this email already exists.",
+            )
+        db.add(User(user_id=_user_id_for(email), email=email, password=body.password))
     return RegisterResponse(message="Registration accepted.", email=email)
 
 
@@ -98,26 +93,23 @@ async def dev_register(body: RegisterRequest) -> RegisterResponse:
     response_model=LoginResponse,
     summary="Dev-only login that issues a signed JWT",
 )
-async def dev_login(body: LoginRequest) -> LoginResponse:
-    """
-    Validates credentials against the in-memory user store and returns a signed JWT.
-
-    The token is signed with SUPABASE_JWT_SECRET (HS256, aud='authenticated') so it
-    is accepted by the backend's get_current_user dependency without modification.
-    Gated behind SKIP_EMAIL_VERIFICATION=true. Returns 403 in production.
-    """
+async def dev_login(body: LoginRequest, db: AsyncSession = Depends(get_db)) -> LoginResponse:
     _require_dev()
     email = _validated_email(body.email)
-    entry = _user_store.get(email)
-    if entry is None or entry["password"] != body.password:
+    user = await db.scalar(select(User).where(User.email == email))
+    if user is None or user.password != body.password:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid login credentials",
         )
-    user_id = entry["user_id"]
     return LoginResponse(
-        user_id=user_id,
+        user_id=user.user_id,
         email=email,
-        access_token=_issue_token(user_id, email),
-        refresh_token=f"local-refresh-{uuid.uuid4()}",
+        access_token=_issue_token(user.user_id, email),
+        refresh_token=f"local-refresh-{user.user_id}",
     )
+
+
+@router.get("/me", summary="Return the current authenticated user")
+async def me(current_user: dict = Depends(get_current_user)) -> dict:
+    return current_user
