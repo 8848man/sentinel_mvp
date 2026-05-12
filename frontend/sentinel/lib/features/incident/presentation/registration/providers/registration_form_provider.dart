@@ -49,7 +49,7 @@ class RegistrationFormState {
   }
 }
 
-class RegistrationFormNotifier extends Notifier<RegistrationFormState> {
+class RegistrationFormNotifier extends AutoDisposeNotifier<RegistrationFormState> {
   @override
   RegistrationFormState build() => const RegistrationFormState();
 
@@ -104,6 +104,6 @@ class RegistrationFormNotifier extends Notifier<RegistrationFormState> {
 }
 
 final registrationFormProvider =
-    NotifierProvider<RegistrationFormNotifier, RegistrationFormState>(
+    NotifierProvider.autoDispose<RegistrationFormNotifier, RegistrationFormState>(
   RegistrationFormNotifier.new,
 );
