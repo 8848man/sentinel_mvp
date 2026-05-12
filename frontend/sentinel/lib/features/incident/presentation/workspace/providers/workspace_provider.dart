@@ -6,6 +6,7 @@ import '../../../domain/entities/incident.dart';
 import '../../../domain/entities/checklist_item.dart';
 import '../../../domain/entities/fix_flow.dart';
 import '../../../domain/usecases/close_incident.dart';
+import '../../../domain/repositories/incident_repository.dart';
 
 @immutable
 class WorkspaceState {
@@ -16,6 +17,7 @@ class WorkspaceState {
     this.togglingItemId,
     this.isResolving = false,
     this.isClosing = false,
+    this.isReopening = false,
     this.error,
     this.navigateToDashboard = false,
   });
@@ -26,6 +28,7 @@ class WorkspaceState {
   final String? togglingItemId;
   final bool isResolving;
   final bool isClosing;
+  final bool isReopening;
   final String? error;
   final bool navigateToDashboard;
 
@@ -36,6 +39,7 @@ class WorkspaceState {
     String? togglingItemId,
     bool? isResolving,
     bool? isClosing,
+    bool? isReopening,
     String? error,
     bool? navigateToDashboard,
     bool clearTogglingItem = false,
@@ -49,6 +53,7 @@ class WorkspaceState {
           clearTogglingItem ? null : (togglingItemId ?? this.togglingItemId),
       isResolving: isResolving ?? this.isResolving,
       isClosing: isClosing ?? this.isClosing,
+      isReopening: isReopening ?? this.isReopening,
       error: clearError ? null : (error ?? this.error),
       navigateToDashboard: navigateToDashboard ?? this.navigateToDashboard,
     );
@@ -195,6 +200,20 @@ class WorkspaceNotifier extends FamilyNotifier<WorkspaceState, String> {
     } catch (_) {
       state = state.copyWith(
           isClosing: false, error: 'Failed to close incident.');
+    }
+  }
+
+  Future<void> reopen() async {
+    state = state.copyWith(isReopening: true, clearError: true);
+    try {
+      final repo = ref.read(incidentRepositoryProvider);
+      await repo.patchIncident(arg, status: 'in_progress');
+      await _silentReload(arg);
+      state = state.copyWith(isReopening: false);
+      ref.read(incidentListStampProvider.notifier).state++;
+    } catch (_) {
+      state = state.copyWith(
+          isReopening: false, error: 'Failed to reopen incident.');
     }
   }
 }
