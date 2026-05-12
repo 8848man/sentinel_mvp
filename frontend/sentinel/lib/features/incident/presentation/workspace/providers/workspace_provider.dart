@@ -89,9 +89,20 @@ class WorkspaceNotifier extends FamilyNotifier<WorkspaceState, String> {
       final updated =
           await useCase(itemId, isCompleted: !currentCompleted);
       _applyChecklistUpdate(updated);
+      _silentReload(arg); // refresh timeline without blocking UI
     } catch (_) {
       state = state.copyWith(
           clearTogglingItem: true, error: 'Failed to update step.');
+    }
+  }
+
+  Future<void> _silentReload(String id) async {
+    try {
+      final useCase = ref.read(getIncidentDetailUseCaseProvider);
+      final incident = await useCase(id);
+      state = state.copyWith(incident: incident);
+    } catch (_) {
+      // Keep current state if background reload fails.
     }
   }
 
