@@ -227,6 +227,47 @@ class IncidentRemoteDatasource implements IncidentDatasource {
     return updated;
   }
 
+  // ── PATCH /incidents/{id}/close ───────────────────────────────────────────
+
+  Future<IncidentModel> closeIncident(String id) async {
+    await Future.delayed(const Duration(milliseconds: 300));
+    final idx = _store.indexWhere((i) => i.id == id);
+    if (idx == -1) throw Exception('Incident not found: $id');
+
+    final old = _store[idx];
+    final now = DateTime.now().toUtc();
+    final newTimeline = List<TimelineEventModel>.from(old.timeline)
+      ..add(TimelineEventModel(
+        id: 'mock-te-close-${now.millisecondsSinceEpoch}',
+        event: 'Incident closed',
+        occurredAt: now,
+      ));
+
+    final updated = IncidentModel(
+      id: old.id,
+      incidentCode: old.incidentCode,
+      title: old.title,
+      description: old.description,
+      logText: old.logText,
+      severity: old.severity,
+      status: 'closed',
+      components: old.components,
+      rootCause: old.rootCause,
+      confidence: old.confidence,
+      selectedFixFlowId: old.selectedFixFlowId,
+      resolvedAt: old.resolvedAt,
+      createdAt: old.createdAt,
+      updatedAt: now,
+      fixFlows: old.fixFlows,
+      similarIncidents: old.similarIncidents,
+      timeline: newTimeline,
+      note: old.note,
+    );
+
+    _store[idx] = updated;
+    return updated;
+  }
+
   // ── PATCH /checklist/{item_id} ─────────────────────────────────────────────
 
   Future<ChecklistItemModel> updateChecklistItem(
@@ -348,8 +389,6 @@ class IncidentRemoteDatasource implements IncidentDatasource {
 
   Future<List<IncidentModel>> getArchiveIncidents() async {
     await Future.delayed(const Duration(milliseconds: 400));
-    return _store
-        .where((i) => i.status == 'resolved' || i.status == 'closed')
-        .toList();
+    return _store.where((i) => i.status == 'closed').toList();
   }
 }

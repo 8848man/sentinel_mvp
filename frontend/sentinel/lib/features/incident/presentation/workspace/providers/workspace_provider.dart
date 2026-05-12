@@ -5,6 +5,7 @@ import '../../../di/incident_module.dart';
 import '../../../domain/entities/incident.dart';
 import '../../../domain/entities/checklist_item.dart';
 import '../../../domain/entities/fix_flow.dart';
+import '../../../domain/usecases/close_incident.dart';
 
 @immutable
 class WorkspaceState {
@@ -14,6 +15,7 @@ class WorkspaceState {
     this.noteContent = '',
     this.togglingItemId,
     this.isResolving = false,
+    this.isClosing = false,
     this.error,
     this.navigateToDashboard = false,
   });
@@ -23,6 +25,7 @@ class WorkspaceState {
   final String noteContent;
   final String? togglingItemId;
   final bool isResolving;
+  final bool isClosing;
   final String? error;
   final bool navigateToDashboard;
 
@@ -32,6 +35,7 @@ class WorkspaceState {
     String? noteContent,
     String? togglingItemId,
     bool? isResolving,
+    bool? isClosing,
     String? error,
     bool? navigateToDashboard,
     bool clearTogglingItem = false,
@@ -44,6 +48,7 @@ class WorkspaceState {
       togglingItemId:
           clearTogglingItem ? null : (togglingItemId ?? this.togglingItemId),
       isResolving: isResolving ?? this.isResolving,
+      isClosing: isClosing ?? this.isClosing,
       error: clearError ? null : (error ?? this.error),
       navigateToDashboard: navigateToDashboard ?? this.navigateToDashboard,
     );
@@ -166,6 +171,19 @@ class WorkspaceNotifier extends FamilyNotifier<WorkspaceState, String> {
     } catch (_) {
       state = state.copyWith(
           isResolving: false, error: 'Failed to resolve incident.');
+    }
+  }
+
+  Future<void> close() async {
+    state = state.copyWith(isClosing: true, clearError: true);
+    try {
+      final useCase = ref.read(closeIncidentUseCaseProvider);
+      await useCase(arg);
+      state = state.copyWith(isClosing: false, navigateToDashboard: true);
+      ref.read(incidentListStampProvider.notifier).state++;
+    } catch (_) {
+      state = state.copyWith(
+          isClosing: false, error: 'Failed to close incident.');
     }
   }
 }

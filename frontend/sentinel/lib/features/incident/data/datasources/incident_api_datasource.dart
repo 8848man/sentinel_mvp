@@ -129,6 +129,19 @@ class IncidentApiDatasource implements IncidentDatasource {
     }
   }
 
+  // ── PATCH /incidents/{id}/close ──────────────────────────────────────────────
+
+  @override
+  Future<IncidentModel> closeIncident(String id) async {
+    try {
+      await _dio.patch(ApiEndpoints.closeIncident(id));
+      final detail = await _dio.get(ApiEndpoints.incidentById(id));
+      return IncidentModel.fromJson(detail.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw Exception(_detail(e));
+    }
+  }
+
   // ── PATCH /checklist/{item_id} ───────────────────────────────────────────────
   // The API returns only {id, is_completed, updated_at}.
   // step_number and description are defaulted to 0 / '' here;

@@ -30,6 +30,9 @@ abstract class IncidentRepository {
   /// Marks incident as resolved.
   Future<Incident> resolveIncident(String id);
 
+  /// Marks a resolved incident as closed.
+  Future<Incident> closeIncident(String id);
+
   /// Toggles a checklist item's completion state.
   Future<ChecklistItem> updateChecklistItem(String itemId, {required bool isCompleted});
 

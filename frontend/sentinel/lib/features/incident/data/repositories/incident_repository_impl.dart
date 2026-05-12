@@ -63,6 +63,12 @@ class IncidentRepositoryImpl implements IncidentRepository {
   }
 
   @override
+  Future<Incident> closeIncident(String id) async {
+    final model = await _datasource.closeIncident(id);
+    return model.toEntity();
+  }
+
+  @override
   Future<ChecklistItem> updateChecklistItem(String itemId,
       {required bool isCompleted}) async {
     final model = await _datasource.updateChecklistItem(
