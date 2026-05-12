@@ -31,8 +31,8 @@ class RegistrationMetadataState {
   }
 }
 
-class RegistrationMetadataNotifier extends Notifier<RegistrationMetadataState> {
-  late final Debounce _debounce;
+class RegistrationMetadataNotifier extends AutoDisposeNotifier<RegistrationMetadataState> {
+  late Debounce _debounce;
 
   @override
   RegistrationMetadataState build() {
@@ -67,6 +67,6 @@ class RegistrationMetadataNotifier extends Notifier<RegistrationMetadataState> {
 }
 
 final registrationMetadataProvider =
-    NotifierProvider<RegistrationMetadataNotifier, RegistrationMetadataState>(
+    NotifierProvider.autoDispose<RegistrationMetadataNotifier, RegistrationMetadataState>(
   RegistrationMetadataNotifier.new,
 );
