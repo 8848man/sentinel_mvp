@@ -181,9 +181,14 @@ class WorkspaceNotifier extends FamilyNotifier<WorkspaceState, String> {
     state = state.copyWith(isResolving: true, clearError: true);
     try {
       final useCase = ref.read(resolveIncidentUseCaseProvider);
-      await useCase(arg);
-      state = state.copyWith(isResolving: false, navigateToDashboard: true);
+      final updated = await useCase(arg);
+      // Bump stamp first so the dashboard starts reloading before navigation.
       ref.read(incidentListStampProvider.notifier).state++;
+      state = state.copyWith(
+        isResolving: false,
+        incident: updated,
+        navigateToDashboard: true,
+      );
     } catch (_) {
       state = state.copyWith(
           isResolving: false, error: 'Failed to resolve incident.');
@@ -194,9 +199,13 @@ class WorkspaceNotifier extends FamilyNotifier<WorkspaceState, String> {
     state = state.copyWith(isClosing: true, clearError: true);
     try {
       final useCase = ref.read(closeIncidentUseCaseProvider);
-      await useCase(arg);
-      state = state.copyWith(isClosing: false, navigateToDashboard: true);
+      final updated = await useCase(arg);
       ref.read(incidentListStampProvider.notifier).state++;
+      state = state.copyWith(
+        isClosing: false,
+        incident: updated,
+        navigateToDashboard: true,
+      );
     } catch (_) {
       state = state.copyWith(
           isClosing: false, error: 'Failed to close incident.');
