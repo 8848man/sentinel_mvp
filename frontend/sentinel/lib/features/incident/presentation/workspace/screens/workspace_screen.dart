@@ -360,6 +360,7 @@ class _RightPanel extends StatelessWidget {
                           item: item,
                           totalSteps: selectedFlow.checklistItems.length,
                           isToggling: togglingItemId == item.id,
+                          readOnly: incident.status == 'resolved',
                           onTap: () => onToggleItem(item.id, item.isCompleted),
                         );
                       },
