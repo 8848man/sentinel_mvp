@@ -61,7 +61,7 @@ class WorkspaceState {
 }
 
 class WorkspaceNotifier extends FamilyNotifier<WorkspaceState, String> {
-  late final Debounce _noteDebounce;
+  late Debounce _noteDebounce;
 
   @override
   WorkspaceState build(String incidentId) {
