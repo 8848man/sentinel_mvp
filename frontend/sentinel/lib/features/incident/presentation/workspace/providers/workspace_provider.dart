@@ -105,6 +105,9 @@ class WorkspaceNotifier extends FamilyNotifier<WorkspaceState, String> {
     try {
       final useCase = ref.read(getIncidentDetailUseCaseProvider);
       final incident = await useCase(id);
+      // Don't overwrite state once a navigation has been triggered; a concurrent
+      // resolve/close already wrote the authoritative updated incident.
+      if (state.navigateToDashboard) return;
       state = state.copyWith(incident: incident);
     } catch (_) {
       // Keep current state if background reload fails.
@@ -213,7 +216,9 @@ class WorkspaceNotifier extends FamilyNotifier<WorkspaceState, String> {
   }
 
   Future<void> reopen() async {
-    state = state.copyWith(isReopening: true, clearError: true);
+    // Clear any stale navigateToDashboard flag left over from a previous resolve
+    // so that _silentReload's guard does not suppress the state update.
+    state = state.copyWith(isReopening: true, navigateToDashboard: false, clearError: true);
     try {
       final repo = ref.read(incidentRepositoryProvider);
       await repo.patchIncident(arg, status: 'in_progress');
