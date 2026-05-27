@@ -53,7 +53,9 @@ class AuthNotifier extends Notifier<AuthState> {
     // Methods only manage isLoading and error — never status directly.
     final sub = repo.authStateChanges.listen((user) {
       state = state.copyWith(
-        status: user != null ? AuthStatus.authenticated : AuthStatus.unauthenticated,
+        status: user != null
+            ? AuthStatus.authenticated
+            : AuthStatus.unauthenticated,
         user: user,
       );
     });
@@ -63,7 +65,9 @@ class AuthNotifier extends Notifier<AuthState> {
     repo.getSignedInUser().then((user) {
       if (state.status == AuthStatus.unknown) {
         state = state.copyWith(
-          status: user != null ? AuthStatus.authenticated : AuthStatus.unauthenticated,
+          status: user != null
+              ? AuthStatus.authenticated
+              : AuthStatus.unauthenticated,
           user: user,
         );
       }
@@ -122,4 +126,5 @@ class AuthNotifier extends Notifier<AuthState> {
   String _msg(Object e) => e.toString().replaceAll('Exception: ', '');
 }
 
-final authProvider = NotifierProvider<AuthNotifier, AuthState>(AuthNotifier.new);
+final authProvider =
+    NotifierProvider<AuthNotifier, AuthState>(AuthNotifier.new);

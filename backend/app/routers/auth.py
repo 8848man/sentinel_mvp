@@ -94,6 +94,7 @@ async def dev_register(body: RegisterRequest, db: AsyncSession = Depends(get_db)
     summary="Dev-only login that issues a signed JWT",
 )
 async def dev_login(body: LoginRequest, db: AsyncSession = Depends(get_db)) -> LoginResponse:
+    print('dev_login')
     _require_dev()
     email = _validated_email(body.email)
     user = await db.scalar(select(User).where(User.email == email))

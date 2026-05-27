@@ -32,3 +32,14 @@ flutter run -d chrome `
   --dart-define=USE_MOCK_DATA=false
 ```
 Register an account first via the sign-up screen, then log in.
+
+**cloud db local backend mode** (FastAPI + SQLite):
+```
+flutter run -d chrome `
+  --web-port=3000 `
+  --dart-define=AUTH_PROVIDER=supabase `
+  --dart-define=API_BASE_URL=http://127.0.0.1:8000 `
+  --dart-define=USE_MOCK_DATA=false `
+  --dart-define=SUPABASE_URL=https://cemeuqlytgsiofnpxcui.supabase.co `
+  --dart-define=SUPABASE_ANON_KEY=sb_publishable_iNrg7X3vdsp7M6IaNZayug_4t6Fr5o3
+```

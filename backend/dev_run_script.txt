@@ -1,5 +1,5 @@
 ## venv 실행
 .venv\Scripts\activate
 
-## uvicorn으로 app 실행
 uvicorn app.main:app --reload
+## uvicorn으로 app 실행
