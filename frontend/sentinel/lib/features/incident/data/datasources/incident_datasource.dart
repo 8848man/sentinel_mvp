@@ -25,6 +25,8 @@ abstract class IncidentDatasource {
 
   Future<IncidentModel> resolveIncident(String id);
 
+  Future<IncidentModel> closeIncident(String id);
+
   Future<ChecklistItemModel> updateChecklistItem(
     String itemId, {
     required bool isCompleted,

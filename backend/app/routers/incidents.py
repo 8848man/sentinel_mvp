@@ -79,3 +79,13 @@ async def resolve_incident(
 ):
     """Spec: PATCH /incidents/{id}/resolve — mark as resolved."""
     return await incident_service.resolve_incident(incident_id, current_user["user_id"], db)
+
+
+@router.patch("/incidents/{incident_id}/close")
+async def close_incident(
+    incident_id: str,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """PATCH /incidents/{id}/close — transition resolved incident to closed."""
+    return await incident_service.close_incident(incident_id, current_user["user_id"], db)

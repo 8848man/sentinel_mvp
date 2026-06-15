@@ -134,6 +134,14 @@ async def resolve_incident(incident_id: str, user_id: str, db: AsyncSession):
     return {"id": incident.id, "status": "resolved", "resolved_at": incident.resolved_at}
 
 
+async def close_incident(incident_id: str, user_id: str, db: AsyncSession):
+    async with db.begin():
+        incident = await _get_owned(incident_id, user_id, db)
+        incident.status = "closed"
+        db.add(TimelineEvent(incident_id=incident.id, event="Incident closed"))
+    return {"id": incident.id, "status": "closed"}
+
+
 # ── Checklist ──────────────────────────────────────────────────────────────────
 
 async def toggle_checklist_item(item_id: str, is_completed: bool, user_id: str, db: AsyncSession):
@@ -198,7 +206,7 @@ async def mark_fix_flow_attempted(flow_id: str, is_attempted: bool, user_id: str
 async def get_archive_incidents(user_id: str, db: AsyncSession):
     result = await db.execute(
         select(Incident)
-        .where(Incident.user_id == user_id, Incident.status.in_(["resolved", "closed"]))
+        .where(Incident.user_id == user_id, Incident.status == "closed")
         .order_by(Incident.resolved_at.desc())
     )
     incidents = result.scalars().all()

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:sentinel/features/auth/data/providers/auth_repository_provider.dart';
 import 'core/router/app_router.dart';
 import 'design_system/tokens/colors.dart';
 
@@ -11,6 +12,7 @@ class SentinelApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(routerProvider);
 
+    ref.read(authRepositoryProvider).signOut();
     return MaterialApp.router(
       title: 'Sentinel',
       debugShowCheckedModeBanner: false,

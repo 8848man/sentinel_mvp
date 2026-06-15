@@ -75,6 +75,8 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen> {
                         noteController: _noteController,
                         togglingItemId: state.togglingItemId,
                         isResolving: state.isResolving,
+                        isClosing: state.isClosing,
+                        isReopening: state.isReopening,
                         onToggleItem: (itemId, completed) => ref
                             .read(workspaceProvider(widget.incidentId).notifier)
                             .toggleChecklistItem(itemId, completed),
@@ -84,6 +86,12 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen> {
                         onResolve: () => ref
                             .read(workspaceProvider(widget.incidentId).notifier)
                             .resolve(),
+                        onClose: () => ref
+                            .read(workspaceProvider(widget.incidentId).notifier)
+                            .close(),
+                        onReopen: () => ref
+                            .read(workspaceProvider(widget.incidentId).notifier)
+                            .reopen(),
                         onGoToAnalysis: () {
                           ref.invalidate(analysisProvider(widget.incidentId));
                           context.go('/incidents/${widget.incidentId}/analysis');
@@ -164,9 +172,13 @@ class _Body extends StatelessWidget {
     required this.noteController,
     required this.togglingItemId,
     required this.isResolving,
+    required this.isClosing,
+    required this.isReopening,
     required this.onToggleItem,
     required this.onNoteChanged,
     required this.onResolve,
+    required this.onClose,
+    required this.onReopen,
     required this.onGoToAnalysis,
   });
 
@@ -174,9 +186,13 @@ class _Body extends StatelessWidget {
   final TextEditingController noteController;
   final String? togglingItemId;
   final bool isResolving;
+  final bool isClosing;
+  final bool isReopening;
   final void Function(String itemId, bool completed) onToggleItem;
   final ValueChanged<String> onNoteChanged;
   final VoidCallback onResolve;
+  final VoidCallback onClose;
+  final VoidCallback onReopen;
   final VoidCallback onGoToAnalysis;
 
   @override
@@ -190,9 +206,13 @@ class _Body extends StatelessWidget {
         noteController: noteController,
         togglingItemId: togglingItemId,
         isResolving: isResolving,
+        isClosing: isClosing,
+        isReopening: isReopening,
         onToggleItem: onToggleItem,
         onNoteChanged: onNoteChanged,
         onResolve: onResolve,
+        onClose: onClose,
+        onReopen: onReopen,
         onGoToAnalysis: onGoToAnalysis,
       ),
     );
@@ -285,9 +305,13 @@ class _RightPanel extends StatelessWidget {
     required this.noteController,
     required this.togglingItemId,
     required this.isResolving,
+    required this.isClosing,
+    required this.isReopening,
     required this.onToggleItem,
     required this.onNoteChanged,
     required this.onResolve,
+    required this.onClose,
+    required this.onReopen,
     required this.onGoToAnalysis,
   });
 
@@ -295,9 +319,13 @@ class _RightPanel extends StatelessWidget {
   final TextEditingController noteController;
   final String? togglingItemId;
   final bool isResolving;
+  final bool isClosing;
+  final bool isReopening;
   final void Function(String itemId, bool completed) onToggleItem;
   final ValueChanged<String> onNoteChanged;
   final VoidCallback onResolve;
+  final VoidCallback onClose;
+  final VoidCallback onReopen;
   final VoidCallback onGoToAnalysis;
 
   @override
@@ -346,6 +374,7 @@ class _RightPanel extends StatelessWidget {
                           item: item,
                           totalSteps: selectedFlow.checklistItems.length,
                           isToggling: togglingItemId == item.id,
+                          readOnly: incident.status == 'resolved',
                           onTap: () => onToggleItem(item.id, item.isCompleted),
                         );
                       },
@@ -378,7 +407,7 @@ class _RightPanel extends StatelessWidget {
                       onPressed: onGoToAnalysis,
                     ),
                     const SizedBox(width: AppSpacing.sm),
-                    if (isResolving)
+                    if (isResolving || isClosing || isReopening)
                       const SizedBox(
                         width: 18,
                         height: 18,
@@ -387,7 +416,17 @@ class _RightPanel extends StatelessWidget {
                           color: AppColors.accentBlue,
                         ),
                       )
-                    else
+                    else if (incident.status == 'resolved') ...[
+                      SecondaryButton(
+                        label: 'Mark In Progress',
+                        onPressed: onReopen,
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      PrimaryButton(
+                        label: 'Close Incident',
+                        onPressed: onClose,
+                      ),
+                    ] else
                       PrimaryButton(
                         label: 'Mark Resolved',
                         onPressed: onResolve,

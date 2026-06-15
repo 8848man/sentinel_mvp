@@ -58,7 +58,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 Text('Sentinel', style: AppText.displayLarge),
                 const SizedBox(height: AppSpacing.xs),
                 Text('AI Error Resolution Copilot',
-                    style: AppText.bodyMedium.copyWith(color: AppColors.textMuted)),
+                    style: AppText.bodyMedium
+                        .copyWith(color: AppColors.textMuted)),
                 const SizedBox(height: AppSpacing.xl),
 
                 SentinelInput(
@@ -88,22 +89,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   const SizedBox(height: AppSpacing.sm),
                   Text(
                     _validationError ?? auth.error!,
-                    style: AppText.bodySmall.copyWith(color: AppColors.severityCritical),
+                    style: AppText.bodySmall
+                        .copyWith(color: AppColors.severityCritical),
                   ),
                 ],
 
-                const SizedBox(height: AppSpacing.md),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text("don't you have any account? ",
-                        style: AppText.bodySmall),
-                    GestureDetector(
-                      onTap: () => context.go('/signup'),
-                      child: Text('sign up', style: AppText.link),
-                    ),
-                  ],
-                ),
+                // const SizedBox(height: AppSpacing.md),
+                // Row(
+                //   mainAxisAlignment: MainAxisAlignment.center,
+                //   children: [
+                //     Text("don't you have any account? ",
+                //         style: AppText.bodySmall),
+                //     GestureDetector(
+                //       onTap: () => context.go('/signup'),
+                //       child: Text('sign up', style: AppText.link),
+                //     ),
+                //   ],
+                // ),
               ],
             ),
           ),
