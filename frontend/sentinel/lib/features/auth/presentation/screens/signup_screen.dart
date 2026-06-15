@@ -1,12 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
+import '../../../../core/config/app_config.dart';
 import '../../../../design_system/design_system.dart';
 import '../providers/auth_provider.dart';
 
-/// Sign-up is a two-stage flow on one screen.
-/// Stage 1: Enter email → "Send Code" triggers Supabase OTP.
-/// Stage 2: Enter password + received code → "Continue" verifies OTP.
+/// Sign-up screen.
+///
+/// Dev mode (AppConfig.skipEmailVerification == true):
+///   Single-stage — email + password only, no OTP required.
+///
+/// Production mode (AppConfig.skipEmailVerification == false):
+///   Two-stage OTP flow — Stage 1: email + password → Send Code.
+///                         Stage 2: enter received code → Continue.
+///
 /// Field display order matches design: Password → Validation Code → Email.
 class SignupScreen extends ConsumerStatefulWidget {
   const SignupScreen({super.key});
@@ -30,6 +36,18 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     super.dispose();
   }
 
+  // ── Dev mode (skipEmailVerification == true) ──────────────────────────────
+
+  Future<void> _onRegisterDirect() async {
+    final email = _emailCtrl.text.trim();
+    final password = _passwordCtrl.text;
+    if (email.isEmpty || password.isEmpty) return;
+
+    await ref.read(authProvider.notifier).registerDirect(email, password);
+  }
+
+  // ── Production mode (skipEmailVerification == false) ──────────────────────
+
   Future<void> _onSendCode() async {
     final email = _emailCtrl.text.trim();
     final password = _passwordCtrl.text;
@@ -49,10 +67,6 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     if (email.isEmpty || code.isEmpty) return;
 
     await ref.read(authProvider.notifier).verifySignUp(email, code);
-
-    if (mounted && ref.read(authProvider).isAuthenticated) {
-      context.go('/dashboard');
-    }
   }
 
   void _showSnack(String message) {
@@ -99,29 +113,31 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                 ),
                 const SizedBox(height: AppSpacing.md),
 
-                // Validation code — second field as per design
-                Stack(
-                  alignment: Alignment.bottomRight,
-                  children: [
-                    SentinelInput(
-                      label: 'validation code',
-                      placeholder: 'enter received code',
-                      controller: _codeCtrl,
-                    ),
-                    if (!_codeSent)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: AppSpacing.xs),
-                        child: GestureDetector(
-                          onTap: auth.isLoading ? null : _onSendCode,
-                          child: Text(
-                            'Send code',
-                            style: AppText.labelSmall.copyWith(color: AppColors.accentBlue),
+                // Validation code — hidden in dev (skipEmailVerification == true)
+                if (!AppConfig.skipEmailVerification) ...[
+                  Stack(
+                    alignment: Alignment.bottomRight,
+                    children: [
+                      SentinelInput(
+                        label: 'validation code',
+                        placeholder: 'enter received code',
+                        controller: _codeCtrl,
+                      ),
+                      if (!_codeSent)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+                          child: GestureDetector(
+                            onTap: auth.isLoading ? null : _onSendCode,
+                            child: Text(
+                              'Send code',
+                              style: AppText.labelSmall.copyWith(color: AppColors.accentBlue),
+                            ),
                           ),
                         ),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.md),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                ],
 
                 // Email — third field as per design
                 SentinelInput(
@@ -134,7 +150,9 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
 
                 PrimaryButton(
                   label: 'Continue',
-                  onPressed: _codeSent ? _onContinue : _onSendCode,
+                  onPressed: AppConfig.skipEmailVerification
+                      ? _onRegisterDirect
+                      : (_codeSent ? _onContinue : _onSendCode),
                   isLoading: auth.isLoading,
                   fullWidth: true,
                 ),
@@ -147,7 +165,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                   ),
                 ],
 
-                if (_codeSent) ...[
+                if (!AppConfig.skipEmailVerification && _codeSent) ...[
                   const SizedBox(height: AppSpacing.sm),
                   Text(
                     'Code sent — check your email.',

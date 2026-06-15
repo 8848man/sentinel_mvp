@@ -61,6 +61,9 @@ class AnalysisNotifier extends FamilyNotifier<AnalysisState, String> {
     try {
       final useCase = ref.read(selectFixFlowUseCaseProvider);
       final updated = await useCase(arg, flowId);
+      // Bump stamp before navigating so the dashboard starts reloading
+      // while the workspace screen is being pushed (same pattern as resolve/close).
+      ref.read(incidentListStampProvider.notifier).state++;
       state = state.copyWith(
         isSelectingFlow: false,
         incident: updated,

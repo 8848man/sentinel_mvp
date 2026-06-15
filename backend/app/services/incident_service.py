@@ -95,8 +95,8 @@ async def get_incident_detail(incident_id: str, user_id: str, db: AsyncSession) 
         select(Incident)
         .options(
             selectinload(Incident.fix_flows).selectinload(FixFlow.checklist_items),
-            selectinload(Incident.timeline_events),
-            selectinload(Incident.similar_incidents),
+            selectinload(Incident.timeline),
+            selectinload(Incident.similar_incidents).selectinload(SimilarIncident.similar_to),
             selectinload(Incident.note),
         )
         .where(Incident.id == incident_id)
@@ -115,8 +115,9 @@ async def patch_incident(incident_id: str, body: IncidentPatchRequest, user_id: 
     async with db.begin():
         incident = await _get_owned(incident_id, user_id, db)
         if body.selected_fix_flow_id:
-            incident.selected_fix_flow_id = body.selected_fix_flow_id
-            flow = await db.get(FixFlow, body.selected_fix_flow_id)
+            fix_flow_id = str(body.selected_fix_flow_id)  # UUID → str for SQLite binding
+            incident.selected_fix_flow_id = fix_flow_id
+            flow = await db.get(FixFlow, fix_flow_id)
             if flow:
                 db.add(TimelineEvent(incident_id=incident.id, event=f"Fix Flow attached: {flow.title}"))
         if body.status:
@@ -131,6 +132,14 @@ async def resolve_incident(incident_id: str, user_id: str, db: AsyncSession):
         incident.resolved_at = datetime.now(timezone.utc)
         db.add(TimelineEvent(incident_id=incident.id, event="Incident resolved"))
     return {"id": incident.id, "status": "resolved", "resolved_at": incident.resolved_at}
+
+
+async def close_incident(incident_id: str, user_id: str, db: AsyncSession):
+    async with db.begin():
+        incident = await _get_owned(incident_id, user_id, db)
+        incident.status = "closed"
+        db.add(TimelineEvent(incident_id=incident.id, event="Incident closed"))
+    return {"id": incident.id, "status": "closed"}
 
 
 # ── Checklist ──────────────────────────────────────────────────────────────────
@@ -197,7 +206,7 @@ async def mark_fix_flow_attempted(flow_id: str, is_attempted: bool, user_id: str
 async def get_archive_incidents(user_id: str, db: AsyncSession):
     result = await db.execute(
         select(Incident)
-        .where(Incident.user_id == user_id, Incident.status.in_(["resolved", "closed"]))
+        .where(Incident.user_id == user_id, Incident.status == "closed")
         .order_by(Incident.resolved_at.desc())
     )
     incidents = result.scalars().all()

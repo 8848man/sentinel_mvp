@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/api/api_client.dart';
 import '../../../../core/api/api_endpoints.dart';
 import '../../../../core/config/app_config.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../incident/di/incident_module.dart';
 import '../../data/models/dashboard_incident_summary_model.dart';
 import '../../../../design_system/tokens/view_mode.dart';
@@ -54,6 +55,20 @@ class DashboardNotifier extends Notifier<DashboardState> {
   DashboardState build() {
     _startClock();
     ref.onDispose(() => _clockTimer?.cancel());
+
+    // Re-login: non-autoDispose means build() only fires once. This covers the
+    // case where the user logs out and back in — build() won't fire again, but
+    // the unauthenticated → authenticated transition triggers a fresh load.
+    ref.listen<AuthState>(authProvider, (prev, next) {
+      if (next.isAuthenticated && prev?.isAuthenticated != true) {
+        loadIncidents();
+      }
+    });
+
+    // Incident mutations: any create or resolve bumps incidentListStampProvider,
+    // which triggers a reload while keeping existing incidents visible (no flash).
+    ref.listen<int>(incidentListStampProvider, (_, __) => loadIncidents());
+
     Future.microtask(loadIncidents);
     return DashboardState(utcTime: DateTime.now().toUtc());
   }
@@ -97,7 +112,7 @@ class DashboardNotifier extends Notifier<DashboardState> {
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
-        error: 'Failed to load incidents. Pull to refresh.',
+        error: kDebugMode ? e.toString() : 'Failed to load incidents.',
       );
     }
   }

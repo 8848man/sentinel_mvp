@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../../design_system/design_system.dart';
 import '../../../domain/entities/incident.dart';
 import '../providers/analysis_provider.dart';
+import '../../workspace/providers/workspace_provider.dart';
 import '../widgets/fix_flow_row.dart';
 import '../widgets/similar_incident_item.dart';
 import '../../shared/widgets/incident_detail_dialog.dart';
@@ -19,6 +20,7 @@ class AnalysisScreen extends ConsumerWidget {
 
     ref.listen<AnalysisState>(analysisProvider(incidentId), (prev, next) {
       if (prev?.navigateToWorkspace == false && next.navigateToWorkspace) {
+        ref.invalidate(workspaceProvider(incidentId));
         context.go('/incidents/$incidentId/workspace');
       }
     });

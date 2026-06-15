@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.database import init_db
-from app.routers import incidents, checklist, notes, timeline, fix_flows, archive
+from app.routers import incidents, checklist, notes, timeline, fix_flows, archive, auth
 
 
 @asynccontextmanager
@@ -24,6 +24,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    app.include_router(auth.router, prefix="/api/v1")
     app.include_router(incidents.router, prefix="/api/v1")
     app.include_router(checklist.router, prefix="/api/v1")
     app.include_router(notes.router, prefix="/api/v1")

@@ -49,7 +49,7 @@ class RegistrationFormState {
   }
 }
 
-class RegistrationFormNotifier extends Notifier<RegistrationFormState> {
+class RegistrationFormNotifier extends AutoDisposeNotifier<RegistrationFormState> {
   @override
   RegistrationFormState build() => const RegistrationFormState();
 
@@ -93,16 +93,17 @@ class RegistrationFormNotifier extends Notifier<RegistrationFormState> {
         components: List.from(state.components),
       );
       state = state.copyWith(isSubmitting: false, createdIncidentId: incident.id);
-    } catch (_) {
+      ref.read(incidentListStampProvider.notifier).state++;
+    } catch (e) {
       state = state.copyWith(
         isSubmitting: false,
-        submitError: 'Failed to create incident. Please try again.',
+        submitError: kDebugMode ? e.toString() : 'Failed to create incident. Please try again.',
       );
     }
   }
 }
 
 final registrationFormProvider =
-    NotifierProvider<RegistrationFormNotifier, RegistrationFormState>(
+    NotifierProvider.autoDispose<RegistrationFormNotifier, RegistrationFormState>(
   RegistrationFormNotifier.new,
 );
