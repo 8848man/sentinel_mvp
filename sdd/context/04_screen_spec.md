@@ -1,6 +1,6 @@
 # 04 — Screen Specification
 
-**Refs:** → [User Flow](./03_user_flow.md) · [Frontend Architecture](../frontend/10_frontend_arch.md)  
+**Refs:** → [User Flow](./03_user_flow.md) · [Frontend Architecture](../frontend/10_frontend_arch.md) · [Responsive Strategy](../frontend/10_2_responsive_strategy.md)  
 **Design refs:** `/sentinel_screen_ref/*.png`
 
 ---

@@ -25,6 +25,20 @@
 | 12 | [Testing Spec](./infra/12_testing_spec.md) | Unit, widget, integration, API tests | ≤150 |
 | 13 | [Agent Instructions](./13_agent_instructions.md) | Agent roles, boundaries, collaboration | ≤300 |
 
+### Frontend Sub-Documents (10.x)
+
+Sub-numbered like `10_1_folder_structure.md`; each owns one responsibility per [`sdd/rules/spec_authoring_rules.md`](./rules/spec_authoring_rules.md).
+
+| # | Document | Purpose |
+|---|----------|---------|
+| 10.1 | [Folder Structure](./frontend/10_1_folder_structure.md) | Flutter `lib/` directory layout |
+| 10.2 | [Responsive Strategy](./frontend/10_2_responsive_strategy.md) | Breakpoints, global responsive decisions, roadmap |
+| 10.3 | [Responsive: Dashboard](./frontend/10_3_responsive_dashboard.md) | Dashboard board/header responsive rules |
+| 10.4 | [Responsive: Incident Flow](./frontend/10_4_responsive_incident_flow.md) | Registration/Analysis/Workspace `TwoPanelLayout` collapse |
+| 10.5 | [Responsive: Archive](./frontend/10_5_responsive_archive.md) | Archive table → card list |
+| 10.6 | [Responsive: Auth & Dialogs](./frontend/10_6_responsive_auth_dialogs.md) | Login/Signup card, Detail Dialog → bottom sheet |
+| 10.7 | [Responsive: Mobile IA](./frontend/10_7_responsive_mobile_ia.md) | Mobile navigation/IA |
+
 ---
 
 ## Design References
@@ -51,7 +65,7 @@ All screen PNGs are in `/sentinel_screen_ref/`. Every screen spec maps directly 
 01_requirements
     └──> 02_product_spec
              └──> 03_user_flow
-                      └──> 04_screen_spec ──> 10_frontend_arch
+                      └──> 04_screen_spec ──> 10_frontend_arch ──> 10_2..10_7 (responsive sub-docs)
                       └──> 05_api_spec    ──> 09_backend_arch
                       └──> 06_database_schema
                       └──> 07_auth_spec
