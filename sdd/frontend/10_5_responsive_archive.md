@@ -15,6 +15,7 @@ Archive renders a fixed 6-column flex `Row` table (`Code`/`Title`/`Severity`/`St
 - ≥1200px: unchanged (current).
 - Row tap → detail content opens as a bottom sheet <768px, centered dialog ≥768px (shared with [Auth & Dialogs spec](./10_6_responsive_auth_dialogs.md#decisions)).
 - Start the card design screen-local (mirrors current `_ArchiveTable`/`_TableRow` being screen-local, not DS components); promote to a shared DS component only if reuse emerges elsewhere.
+- Add pull-to-refresh (`RefreshIndicator`) on mobile — same additive reasoning as Dashboard (`10_3_responsive_dashboard.md`); no equivalent manual-refresh exists on desktop today.
 
 # Requirements
 

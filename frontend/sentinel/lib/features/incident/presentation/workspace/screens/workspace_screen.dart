@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 import '../../../../../design_system/design_system.dart';
 import '../../../domain/entities/incident.dart';
 import '../../../domain/entities/fix_flow.dart';
+import '../../../domain/entities/timeline_event.dart';
 import '../providers/workspace_provider.dart';
 import '../widgets/checklist_item_widget.dart';
 import '../../analysis/providers/analysis_provider.dart';
+import '../../shared/widgets/timeline_list.dart';
+import '../../shared/widgets/full_timeline_sheet.dart';
 
 class WorkspaceScreen extends ConsumerStatefulWidget {
   const WorkspaceScreen({super.key, required this.incidentId});
@@ -20,22 +22,31 @@ class WorkspaceScreen extends ConsumerStatefulWidget {
 
 class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen> {
   late final TextEditingController _noteController;
+  late final FocusNode _noteFocusNode;
 
   @override
   void initState() {
     super.initState();
     _noteController = TextEditingController();
+    // Drives the mobile-only collapsed-preview/expand-on-focus behavior for
+    // Notes (10_4_responsive_incident_flow.md) — same controller throughout,
+    // only the rendered height changes, so in-progress text and the existing
+    // debounced auto-save in workspace_provider.dart are unaffected.
+    _noteFocusNode = FocusNode();
+    _noteFocusNode.addListener(() => setState(() {}));
   }
 
   @override
   void dispose() {
     _noteController.dispose();
+    _noteFocusNode.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(workspaceProvider(widget.incidentId));
+    final stacked = context.isMobileWidth;
 
     // Sync controller text when incident first loads
     ref.listen<WorkspaceState>(workspaceProvider(widget.incidentId),
@@ -48,6 +59,45 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen> {
       }
     });
 
+    Widget body;
+    if (state.isLoading) {
+      body = const Center(
+          child: CircularProgressIndicator(color: AppColors.accentBlue));
+    } else if (state.error != null && state.incident == null) {
+      body = _ErrorView(
+        message: state.error!,
+        onRetry: () => ref.invalidate(workspaceProvider(widget.incidentId)),
+      );
+    } else {
+      final content = _Body(
+        incident: state.incident!,
+        noteController: _noteController,
+        noteFocusNode: _noteFocusNode,
+        togglingItemId: state.togglingItemId,
+        isResolving: state.isResolving,
+        isClosing: state.isClosing,
+        isReopening: state.isReopening,
+        stacked: stacked,
+        onToggleItem: (itemId, completed) => ref
+            .read(workspaceProvider(widget.incidentId).notifier)
+            .toggleChecklistItem(itemId, completed),
+        onNoteChanged: (content) => ref
+            .read(workspaceProvider(widget.incidentId).notifier)
+            .updateNote(content),
+        onResolve: () =>
+            ref.read(workspaceProvider(widget.incidentId).notifier).resolve(),
+        onClose: () =>
+            ref.read(workspaceProvider(widget.incidentId).notifier).close(),
+        onReopen: () =>
+            ref.read(workspaceProvider(widget.incidentId).notifier).reopen(),
+        onGoToAnalysis: () {
+          ref.invalidate(analysisProvider(widget.incidentId));
+          context.go('/incidents/${widget.incidentId}/analysis');
+        },
+      );
+      body = stacked ? SingleChildScrollView(child: content) : content;
+    }
+
     return SentinelScaffold(
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -59,45 +109,35 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen> {
           const SizedBox(height: AppSpacing.md),
           if (state.error != null && state.incident != null)
             _InlineError(message: state.error!),
-          Expanded(
-            child: state.isLoading
-                ? const Center(
-                    child: CircularProgressIndicator(
-                        color: AppColors.accentBlue))
-                : state.error != null && state.incident == null
-                    ? _ErrorView(
-                        message: state.error!,
-                        onRetry: () =>
-                            ref.invalidate(workspaceProvider(widget.incidentId)),
-                      )
-                    : _Body(
-                        incident: state.incident!,
-                        noteController: _noteController,
-                        togglingItemId: state.togglingItemId,
-                        isResolving: state.isResolving,
-                        isClosing: state.isClosing,
-                        isReopening: state.isReopening,
-                        onToggleItem: (itemId, completed) => ref
-                            .read(workspaceProvider(widget.incidentId).notifier)
-                            .toggleChecklistItem(itemId, completed),
-                        onNoteChanged: (content) => ref
-                            .read(workspaceProvider(widget.incidentId).notifier)
-                            .updateNote(content),
-                        onResolve: () => ref
-                            .read(workspaceProvider(widget.incidentId).notifier)
-                            .resolve(),
-                        onClose: () => ref
-                            .read(workspaceProvider(widget.incidentId).notifier)
-                            .close(),
-                        onReopen: () => ref
-                            .read(workspaceProvider(widget.incidentId).notifier)
-                            .reopen(),
-                        onGoToAnalysis: () {
-                          ref.invalidate(analysisProvider(widget.incidentId));
-                          context.go('/incidents/${widget.incidentId}/analysis');
-                        },
-                      ),
-          ),
+          Expanded(child: body),
+          // Mobile-only sticky action bar — Layout Change (D11): same
+          // actions/order as the inline row it replaces, just always
+          // reachable without scrolling (10_4_responsive_incident_flow.md).
+          if (stacked && state.incident != null)
+            StickyActionBar(
+              children: [
+                _ActionButtons(
+                  isResolving: state.isResolving,
+                  isClosing: state.isClosing,
+                  isReopening: state.isReopening,
+                  status: state.incident!.status,
+                  onResolve: () => ref
+                      .read(workspaceProvider(widget.incidentId).notifier)
+                      .resolve(),
+                  onClose: () => ref
+                      .read(workspaceProvider(widget.incidentId).notifier)
+                      .close(),
+                  onReopen: () => ref
+                      .read(workspaceProvider(widget.incidentId).notifier)
+                      .reopen(),
+                  onGoToAnalysis: () {
+                    ref.invalidate(analysisProvider(widget.incidentId));
+                    context.go('/incidents/${widget.incidentId}/analysis');
+                  },
+                  stacked: true,
+                ),
+              ],
+            ),
         ],
       ),
     );
@@ -170,6 +210,7 @@ class _Body extends StatelessWidget {
   const _Body({
     required this.incident,
     required this.noteController,
+    required this.noteFocusNode,
     required this.togglingItemId,
     required this.isResolving,
     required this.isClosing,
@@ -180,10 +221,12 @@ class _Body extends StatelessWidget {
     required this.onClose,
     required this.onReopen,
     required this.onGoToAnalysis,
+    required this.stacked,
   });
 
   final Incident incident;
   final TextEditingController noteController;
+  final FocusNode noteFocusNode;
   final String? togglingItemId;
   final bool isResolving;
   final bool isClosing;
@@ -194,27 +237,40 @@ class _Body extends StatelessWidget {
   final VoidCallback onClose;
   final VoidCallback onReopen;
   final VoidCallback onGoToAnalysis;
+  final bool stacked;
 
   @override
   Widget build(BuildContext context) {
+    final left = _LeftPanel(incident: incident, stacked: stacked);
+    final right = _RightPanel(
+      incident: incident,
+      noteController: noteController,
+      noteFocusNode: noteFocusNode,
+      togglingItemId: togglingItemId,
+      isResolving: isResolving,
+      isClosing: isClosing,
+      isReopening: isReopening,
+      onToggleItem: onToggleItem,
+      onNoteChanged: onNoteChanged,
+      onResolve: onResolve,
+      onClose: onClose,
+      onReopen: onReopen,
+      onGoToAnalysis: onGoToAnalysis,
+      stacked: stacked,
+    );
+
+    if (stacked) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [left, const SizedBox(height: AppSpacing.md), right],
+      );
+    }
+
     return TwoPanelLayout(
       leftFlex: 28,
       rightFlex: 72,
-      left: _LeftPanel(incident: incident),
-      right: _RightPanel(
-        incident: incident,
-        noteController: noteController,
-        togglingItemId: togglingItemId,
-        isResolving: isResolving,
-        isClosing: isClosing,
-        isReopening: isReopening,
-        onToggleItem: onToggleItem,
-        onNoteChanged: onNoteChanged,
-        onResolve: onResolve,
-        onClose: onClose,
-        onReopen: onReopen,
-        onGoToAnalysis: onGoToAnalysis,
-      ),
+      left: left,
+      right: right,
     );
   }
 }
@@ -222,8 +278,9 @@ class _Body extends StatelessWidget {
 // ── Left panel: incident meta + timeline ─────────────────────────────────────
 
 class _LeftPanel extends StatelessWidget {
-  const _LeftPanel({required this.incident});
+  const _LeftPanel({required this.incident, required this.stacked});
   final Incident incident;
+  final bool stacked;
 
   @override
   Widget build(BuildContext context) {
@@ -269,31 +326,35 @@ class _LeftPanel extends StatelessWidget {
             style: AppText.bodySmall.copyWith(color: AppColors.textPrimary),
           ),
           const SizedBox(height: AppSpacing.lg),
-          // Timeline
+          // Timeline — exactly the 3 most recent events on mobile (Decision:
+          // Timeline Summary Count, 10_4_responsive_incident_flow.md); full
+          // history one tap away via the existing bottom-sheet pattern.
+          // Desktop/tablet show the full list inline, unchanged.
           Text('Timeline', style: AppText.titleMedium),
           const SizedBox(height: AppSpacing.sm),
-          Expanded(
-            child: incident.timeline.isEmpty
-                ? Text('No events recorded.', style: AppText.bodySmall)
-                : ListView.separated(
-                    itemCount: incident.timeline.length,
-                    separatorBuilder: (_, __) =>
-                        const SizedBox(height: AppSpacing.xs),
-                    itemBuilder: (_, i) {
-                      final event = incident.timeline[i];
-                      final time = DateFormat('HH:mm')
-                          .format(event.occurredAt.toLocal());
-                      return Text(
-                        '$time — ${event.event}',
-                        style: AppText.bodySmall
-                            .copyWith(color: AppColors.textPrimary),
-                      );
-                    },
-                  ),
-          ),
+          TimelineList(events: _displayedEvents, shrinkWrap: stacked),
+          if (stacked && incident.timeline.length > _mobileTimelineCount) ...[
+            const SizedBox(height: AppSpacing.sm),
+            GestureDetector(
+              onTap: () => showFullTimelineSheet(context, incident.id),
+              child: Text(
+                'View full timeline (${incident.timeline.length})',
+                style: AppText.labelMedium.copyWith(color: AppColors.accentBlue),
+              ),
+            ),
+          ],
         ],
       ),
     );
+  }
+
+  static const _mobileTimelineCount = 3;
+
+  List<TimelineEvent> get _displayedEvents {
+    if (!stacked || incident.timeline.length <= _mobileTimelineCount) {
+      return incident.timeline;
+    }
+    return incident.timeline.sublist(incident.timeline.length - _mobileTimelineCount);
   }
 }
 
@@ -303,6 +364,7 @@ class _RightPanel extends StatelessWidget {
   const _RightPanel({
     required this.incident,
     required this.noteController,
+    required this.noteFocusNode,
     required this.togglingItemId,
     required this.isResolving,
     required this.isClosing,
@@ -313,10 +375,12 @@ class _RightPanel extends StatelessWidget {
     required this.onClose,
     required this.onReopen,
     required this.onGoToAnalysis,
+    required this.stacked,
   });
 
   final Incident incident;
   final TextEditingController noteController;
+  final FocusNode noteFocusNode;
   final String? togglingItemId;
   final bool isResolving;
   final bool isClosing;
@@ -327,6 +391,7 @@ class _RightPanel extends StatelessWidget {
   final VoidCallback onClose;
   final VoidCallback onReopen;
   final VoidCallback onGoToAnalysis;
+  final bool stacked;
 
   @override
   Widget build(BuildContext context) {
@@ -336,116 +401,185 @@ class _RightPanel extends StatelessWidget {
             .firstOrNull
         : null;
 
+    final checklistBody = selectedFlow == null
+        ? Padding(
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
+            child: Center(
+              child: Text(
+                'No fix flow selected.\nGo back to Analysis to select one.',
+                style: AppText.bodyMedium.copyWith(color: AppColors.textMuted),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          )
+        : ListView.builder(
+            shrinkWrap: stacked,
+            physics: stacked ? const NeverScrollableScrollPhysics() : null,
+            itemCount: selectedFlow.checklistItems.length,
+            itemBuilder: (_, i) {
+              final item = selectedFlow.checklistItems[i];
+              return ChecklistItemWidget(
+                item: item,
+                totalSteps: selectedFlow.checklistItems.length,
+                isToggling: togglingItemId == item.id,
+                readOnly: incident.status == 'resolved',
+                onTap: () => onToggleItem(item.id, item.isCompleted),
+              );
+            },
+          );
+
+    final checklistCard = Container(
+      decoration: BoxDecoration(
+        color: AppColors.bgCard,
+        borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
+      ),
+      padding: const EdgeInsets.all(AppSpacing.cardPadding),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _ChecklistHeader(flow: selectedFlow),
+          const SizedBox(height: AppSpacing.md),
+          stacked ? checklistBody : Expanded(child: checklistBody),
+        ],
+      ),
+    );
+
+    // Notes: collapsed fixed-height preview when unfocused, expands on focus
+    // (Layout Change — 10_4_responsive_incident_flow.md). Same controller
+    // throughout; only minLines/maxLines change, so no text loss and the
+    // existing debounced auto-save is unaffected. Desktop/tablet unchanged
+    // (always `expands: true` inside its own Expanded, as before).
+    final notesCollapsed = stacked && !noteFocusNode.hasFocus;
+    final notesField = SentinelTextArea(
+      placeholder: 'Add notes, observations, or next steps…',
+      controller: noteController,
+      focusNode: noteFocusNode,
+      expands: !stacked,
+      minLines: stacked ? (notesCollapsed ? 3 : 8) : 6,
+      maxLines: stacked ? (notesCollapsed ? 3 : 14) : 20,
+      onChanged: onNoteChanged,
+    );
+
+    final notesCard = Container(
+      decoration: BoxDecoration(
+        color: AppColors.bgCard,
+        borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
+      ),
+      padding: const EdgeInsets.all(AppSpacing.cardPadding),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (stacked)
+            Text('Incident Notes', style: AppText.titleMedium)
+          else
+            Row(
+              children: [
+                Expanded(
+                    child:
+                        Text('Incident Notes', style: AppText.titleMedium)),
+                _ActionButtons(
+                  isResolving: isResolving,
+                  isClosing: isClosing,
+                  isReopening: isReopening,
+                  status: incident.status,
+                  onResolve: onResolve,
+                  onClose: onClose,
+                  onReopen: onReopen,
+                  onGoToAnalysis: onGoToAnalysis,
+                  stacked: false,
+                ),
+              ],
+            ),
+          const SizedBox(height: AppSpacing.sm),
+          stacked ? notesField : Expanded(child: notesField),
+        ],
+      ),
+    );
+
+    if (stacked) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          checklistCard,
+          const SizedBox(height: AppSpacing.md),
+          notesCard,
+        ],
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Checklist card
-        Expanded(
-          flex: 6,
-          child: Container(
-            decoration: BoxDecoration(
-              color: AppColors.bgCard,
-              borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
-            ),
-            padding: const EdgeInsets.all(AppSpacing.cardPadding),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _ChecklistHeader(flow: selectedFlow),
-                const SizedBox(height: AppSpacing.md),
-                if (selectedFlow == null)
-                  Expanded(
-                    child: Center(
-                      child: Text(
-                        'No fix flow selected.\nGo back to Analysis to select one.',
-                        style: AppText.bodyMedium
-                            .copyWith(color: AppColors.textMuted),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  )
-                else
-                  Expanded(
-                    child: ListView.builder(
-                      itemCount: selectedFlow.checklistItems.length,
-                      itemBuilder: (_, i) {
-                        final item = selectedFlow.checklistItems[i];
-                        return ChecklistItemWidget(
-                          item: item,
-                          totalSteps: selectedFlow.checklistItems.length,
-                          isToggling: togglingItemId == item.id,
-                          readOnly: incident.status == 'resolved',
-                          onTap: () => onToggleItem(item.id, item.isCompleted),
-                        );
-                      },
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ),
+        Expanded(flex: 6, child: checklistCard),
         const SizedBox(height: AppSpacing.md),
-        // Notes + actions card
-        Expanded(
-          flex: 4,
-          child: Container(
-            decoration: BoxDecoration(
-              color: AppColors.bgCard,
-              borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
-            ),
-            padding: const EdgeInsets.all(AppSpacing.cardPadding),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text('Incident Notes', style: AppText.titleMedium),
-                    ),
-                    SecondaryButton(
-                      label: '← Analysis',
-                      onPressed: onGoToAnalysis,
-                    ),
-                    const SizedBox(width: AppSpacing.sm),
-                    if (isResolving || isClosing || isReopening)
-                      const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: AppColors.accentBlue,
-                        ),
-                      )
-                    else if (incident.status == 'resolved') ...[
-                      SecondaryButton(
-                        label: 'Mark In Progress',
-                        onPressed: onReopen,
-                      ),
-                      const SizedBox(width: AppSpacing.sm),
-                      PrimaryButton(
-                        label: 'Close Incident',
-                        onPressed: onClose,
-                      ),
-                    ] else
-                      PrimaryButton(
-                        label: 'Mark Resolved',
-                        onPressed: onResolve,
-                      ),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                Expanded(
-                  child: SentinelTextArea(
-                    placeholder: 'Add notes, observations, or next steps…',
-                    controller: noteController,
-                    expands: true,
-                    onChanged: onNoteChanged,
-                  ),
-                ),
-              ],
-            ),
-          ),
+        Expanded(flex: 4, child: notesCard),
+      ],
+    );
+  }
+}
+
+// ── Action buttons (full-width stacked on mobile, inline row otherwise) ───────
+
+class _ActionButtons extends StatelessWidget {
+  const _ActionButtons({
+    required this.isResolving,
+    required this.isClosing,
+    required this.isReopening,
+    required this.status,
+    required this.onResolve,
+    required this.onClose,
+    required this.onReopen,
+    required this.onGoToAnalysis,
+    required this.stacked,
+  });
+
+  final bool isResolving;
+  final bool isClosing;
+  final bool isReopening;
+  final String status;
+  final VoidCallback onResolve;
+  final VoidCallback onClose;
+  final VoidCallback onReopen;
+  final VoidCallback onGoToAnalysis;
+  final bool stacked;
+
+  @override
+  Widget build(BuildContext context) {
+    if (isResolving || isClosing || isReopening) {
+      return const Align(
+        alignment: Alignment.centerLeft,
+        child: SizedBox(
+          width: 18,
+          height: 18,
+          child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accentBlue),
         ),
+      );
+    }
+
+    final buttons = status == 'resolved'
+        ? [
+            SecondaryButton(label: 'Mark In Progress', onPressed: onReopen),
+            PrimaryButton(label: 'Close Incident', onPressed: onClose),
+          ]
+        : [PrimaryButton(label: 'Mark Resolved', onPressed: onResolve)];
+
+    final backButton = SecondaryButton(label: '← Analysis', onPressed: onGoToAnalysis);
+
+    if (stacked) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final b in buttons) ...[b, const SizedBox(height: AppSpacing.sm)],
+          backButton,
+        ],
+      );
+    }
+
+    return Row(
+      children: [
+        backButton,
+        const SizedBox(width: AppSpacing.sm),
+        for (final b in buttons) ...[b, const SizedBox(width: AppSpacing.sm)],
       ],
     );
   }

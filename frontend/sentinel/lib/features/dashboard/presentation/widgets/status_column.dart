@@ -9,14 +9,52 @@ class StatusColumn extends StatelessWidget {
     required this.label,
     required this.color,
     required this.incidents,
+    this.sectioned = false,
   });
 
   final String label;
   final Color color;
   final List<DashboardIncidentSummaryModel> incidents;
 
+  /// True below the dashboard sub-breakpoint (<900px): renders as a
+  /// full-width labeled section (count in heading, no internal scroll)
+  /// instead of a bounded-height board column.
+  final bool sectioned;
+
+  void _onTap(BuildContext context, DashboardIncidentSummaryModel incident) {
+    context.go(incident.status == 'open'
+        ? '/incidents/${incident.id}/analysis'
+        : '/incidents/${incident.id}/workspace');
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (sectioned) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('$label (${incidents.length})',
+              style: AppText.titleMedium.copyWith(color: color)),
+          const SizedBox(height: AppSpacing.sm),
+          if (incidents.isEmpty)
+            Text('No incidents', style: AppText.bodySmall)
+          else
+            ...incidents.map(
+              (incident) => IncidentCard(
+                incidentCode: incident.incidentCode,
+                title: incident.title,
+                description: incident.description,
+                severity: incident.severity,
+                status: incident.status,
+                viewMode: DashboardViewMode.status,
+                createdAt: incident.createdAt,
+                onTap: () => _onTap(context, incident),
+              ),
+            ),
+        ],
+      );
+    }
+
     return Container(
       decoration: BoxDecoration(
         color: AppColors.bgCard.withOpacity(0.3),
@@ -50,6 +88,7 @@ class StatusColumn extends StatelessWidget {
                         severity: incident.severity,
                         status: incident.status,
                         viewMode: DashboardViewMode.status,
+                        createdAt: incident.createdAt,
                         onTap: () => context.go(
                             incident.status == 'open'
                                 ? '/incidents/${incident.id}/analysis'

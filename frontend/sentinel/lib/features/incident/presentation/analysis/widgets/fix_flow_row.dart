@@ -10,6 +10,7 @@ class FixFlowRow extends StatelessWidget {
     required this.isSelected,
     required this.isLoading,
     required this.onTap,
+    this.isRecommended = false,
   });
 
   final FixFlow fixFlow;
@@ -17,6 +18,12 @@ class FixFlowRow extends StatelessWidget {
   final bool isSelected;
   final bool isLoading;
   final VoidCallback onTap;
+
+  /// Highest-confidence unattempted flow (Information Hierarchy Change —
+  /// sdd/frontend/10_4_responsive_incident_flow.md). Visually distinct from
+  /// [isSelected] (blue border) and the per-row "Attempted" indicator: this
+  /// badge is the only green-colored row treatment.
+  final bool isRecommended;
 
   @override
   Widget build(BuildContext context) {
@@ -47,9 +54,33 @@ class FixFlowRow extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    '${index + 1}. ${fixFlow.title}',
-                    style: AppText.bodyMedium,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '${index + 1}. ${fixFlow.title}',
+                          style: AppText.bodyMedium,
+                        ),
+                      ),
+                      if (isRecommended) ...[
+                        const SizedBox(width: AppSpacing.xs),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.sm, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.severityMinor.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(AppSpacing.badgeRadius),
+                          ),
+                          child: Text(
+                            'RECOMMENDED',
+                            style: AppText.labelSmall.copyWith(
+                              color: AppColors.severityMinor,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                   const SizedBox(height: AppSpacing.xs),
                   Text(

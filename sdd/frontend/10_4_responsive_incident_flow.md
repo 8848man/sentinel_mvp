@@ -10,28 +10,40 @@ All three screens use `TwoPanelLayout` (28/72). Grouped here because they share 
 
 # Decisions
 
-- All three: <768px stacks left-panel content above right-panel content, in current document order, as full-width card sections. No content moves behind a tab or accordion — density must stay visible by scrolling, never hidden (per project goal of preserving information density on mobile).
-- Registration: left panel is static instructional text only — collapses into a compact heading above the form, not a stacked section.
-- Analysis: optional persistent bottom CTA bar once a fix flow is selected, mobile only (mirrors prototype's bottom-anchored primary button). New pattern, not in current DS — flag for design review before building.
-- Workspace: action buttons (`Back to Analysis` / `Mark as Resolved`) stack full-width instead of side-by-side <768px. Resolve-confirmation bottom sheet is **Phase 3, contingent on Product Spec Agent sign-off** (see [strategy doc](./10_2_responsive_strategy.md#open-questions-product-spec-agent)) — do not build until approved.
+All decisions below follow the workflow-preservation constraint (`10_2_responsive_strategy.md`, D10): document order, screen hierarchy, and step count match desktop exactly on every breakpoint — only positioning and information-hierarchy default-visibility change.
+
+- All three: <768px stacks left-panel content above right-panel content, in current document order, as full-width card sections. No content moves behind a tab or accordion — density must stay visible by scrolling or one tap of progressive disclosure, never permanently hidden.
+- **Registration:** left panel is static instructional text only — collapses into a compact heading above the form, not a stacked section. Field order stays identical to desktop (Title → Severity → Components → Log → Submit) — do not reorder for mobile. Submit button moves to a sticky bottom bar (Layout Change). Add a "paste from clipboard" quick action next to the log field (additive). Severity must render as large tap-target chips on mobile, not a small native dropdown hit-area.
+- **Analysis:** document order stays Root Cause → Confidence → Similar Incidents → Fix Flows on every breakpoint (matches desktop's left-to-right reading order collapsed top-to-bottom) — do not reorder fix flows ahead of this context. <768px, summarize Root Cause/Confidence/Similar Incidents into a compact card by default (one-line root cause, confidence number, similar-incident count) with an inline "Show details" expand revealing full text/list in place (Information Hierarchy Change — content is fixed-size once analysis completes, so it doesn't compound across revisits the way Workspace's timeline does). Add a "Recommended" visual treatment to the highest-confidence unattempted fix-flow row (Information Hierarchy Change). A confirmation step before committing a fix-flow selection was evaluated and is **not recommended** (D12) — single-tap-select-and-navigate is unchanged.
+- **Workspace:** document order stays Header/badges → Components → Root Cause → Timeline → Checklist → Notes → Actions on every breakpoint — no segmented/tabbed mode-switcher (rejected: desktop shows Timeline, Checklist, and Notes simultaneously; a tab switcher would hide two of three at a time, a workflow change D10 rules out). <768px: summarize Timeline to **exactly the 3 most recent events** by default (fixed count, not a height limit — deterministic regardless of text wrap or font scaling), with a "View full timeline" link opening the existing bottom-sheet pattern (`incident_detail_dialog.dart`'s `DraggableScrollableSheet` + scrollController composition, reused exactly, not reinvented) — see Timeline Requirements below. Notes collapses to a fixed-height preview when unfocused, expanding in place to full editing height on focus (Layout Change). Action buttons (`Back to Analysis` / `Mark as Resolved` / `Close` / `Reopen`) move to a sticky bottom action bar, always visible regardless of scroll position (Layout Change), replacing the prior side-by-side row only in *position*, not order or count. A confirmation step before Mark Resolved/Close was evaluated and is **not recommended** (D12) — single-tap behavior is unchanged.
+
+## Workspace Full Timeline — bottom sheet requirements
+
+- Reuse `incident_detail_dialog.dart`'s exact composition: `showModalBottomSheet` → `DraggableScrollableSheet(initialChildSize: 0.85, minChildSize: 0.5, maxChildSize: 0.95, expand: false)` → `scrollController` passed to an **outer** scrollable, with `TimelineList(shrinkWrap: true)` nested inside — do not give `TimelineList` an independent scrollable (avoids drag-to-scroll vs. drag-to-resize gesture conflicts).
+- Open the sheet already scrolled to the most recent event (`scrollController.jumpTo(maxScrollExtent)` post-frame) — chronological top-to-bottom order is unchanged, only the initial viewport position changes, so the most operationally relevant events are visible without an initial scroll.
+- Above ~20 events, insert lightweight non-interactive hour/time-group separator rows into the same list for scanability — no filter/search control, no new screen.
+- The sheet must watch the same live incident provider Workspace already watches (not a frozen snapshot taken at open-time), so events arriving while the sheet is open appear without reopening it.
+- Sheet height/virtualization need no special handling at any event volume (validated at 10/30/50/100 events): `DraggableScrollableSheet`'s height is a fixed screen fraction regardless of content, and `ListView.builder` virtualizes lazily regardless of count.
+- Dismissing the sheet (swipe down / tap outside / back gesture) returns to Workspace's existing scroll position unchanged — it is an overlay, not a route (`10_7_responsive_mobile_ia.md`).
 
 # Requirements
 
 | Screen | <768px | 768–1199px | ≥1200px |
 |---|---|---|---|
-| Registration | Single column; left panel text becomes a heading | `TwoPanelLayout` flex ~38/62 | `TwoPanelLayout` flex 28/72 (current) |
-| Analysis | Single column: root cause → confidence → similar incidents → fix flows; optional bottom CTA bar when a flow is selected | `TwoPanelLayout` flex ~38/62 | `TwoPanelLayout` flex 28/72 (current) |
-| Workspace | Single column: header → timeline → checklist → notes → stacked full-width action buttons | `TwoPanelLayout` flex ~38/62 | `TwoPanelLayout` flex 28/72 (current) |
+| Registration | Single column; left panel text becomes a heading; sticky bottom submit bar | `TwoPanelLayout` flex ~38/62 | `TwoPanelLayout` flex 28/72 (current) |
+| Analysis | Single column: summarized root cause/confidence/similar incidents (expandable) → fix flows, top recommendation highlighted | `TwoPanelLayout` flex ~38/62 | `TwoPanelLayout` flex 28/72 (current) |
+| Workspace | Single column: header → components → root cause → timeline (last 3 events + "View full timeline" sheet) → checklist → notes (collapsed preview) → sticky bottom action bar | `TwoPanelLayout` flex ~38/62, full timeline inline (current) | `TwoPanelLayout` flex 28/72, full timeline inline (current) |
 
 # Implementation Notes
 
-- Files: `features/incident/presentation/registration/screens/registration_screen.dart`, `analysis/screens/analysis_screen.dart`, `workspace/screens/workspace_screen.dart`.
+- Files: `features/incident/presentation/registration/screens/registration_screen.dart`, `analysis/screens/analysis_screen.dart`, `workspace/screens/workspace_screen.dart`, `shared/widgets/timeline_list.dart`, `shared/widgets/incident_detail_dialog.dart` (pattern to copy for the new Full Timeline sheet, not modify).
 - `MetadataPanel`, `ArchitectureComponentList`, fix-flow/checklist widgets are already full-width-capable inside their current `Expanded` — only the outer `Row`→`Column` swap is needed, not internal rewrites.
 - `FixFlowRow`: verify wrapping behavior at narrow widths on real devices before assuming a dedicated mobile variant is needed.
 - `ChecklistItemWidget`: increase row height for ≥44px touch targets on mobile.
-- Risk: Analysis and Workspace are the densest screens in the product (root cause + confidence + similar incidents + 4 fix-flow rows simultaneously on Analysis) — rated **High** risk/complexity for getting information priority right when stacking.
+- Timeline summarization is the mitigation for the "longer incident → more scrolling to reach checklist" risk previously flagged here as High — content summarization at a fixed default size, not document reordering, resolves it; the rest of the document order is unaffected.
 
 # References
 
-- [`10_2_responsive_strategy.md`](./10_2_responsive_strategy.md) — breakpoints, `TwoPanelLayout` decision
-- [`13_agent_instructions.md`](../13_agent_instructions.md) — sign-off requirement for new screens/flows (bottom CTA bar, resolve confirmation)
+- [`10_2_responsive_strategy.md`](./10_2_responsive_strategy.md) — breakpoints, `TwoPanelLayout` decision, D10–D12 (workflow preservation, sticky action bars, rejected confirmation steps)
+- [`10_7_responsive_mobile_ia.md`](./10_7_responsive_mobile_ia.md) — bottom sheets are overlays, not new routes
+- [`13_agent_instructions.md`](../13_agent_instructions.md) — sign-off requirement for any future cross-platform workflow change

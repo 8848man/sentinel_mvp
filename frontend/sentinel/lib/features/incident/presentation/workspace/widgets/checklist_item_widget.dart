@@ -28,6 +28,7 @@ class ChecklistItemWidget extends StatelessWidget {
         onTap: (isToggling || readOnly) ? null : onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
+          constraints: const BoxConstraints(minHeight: 44),
           margin: const EdgeInsets.only(bottom: AppSpacing.sm),
           padding: const EdgeInsets.symmetric(
               horizontal: AppSpacing.md, vertical: AppSpacing.sm + 2),

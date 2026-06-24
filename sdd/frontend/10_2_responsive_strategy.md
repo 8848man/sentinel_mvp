@@ -21,7 +21,10 @@ Sentinel's Flutter app currently has **no responsive logic anywhere** (no `Media
 | D6 | Modal/dialog content (`incident_detail_dialog.dart`) renders as a bottom sheet <768px, centered dialog ≥768px, same inner content widget both ways. |
 | D7 | Timeline dot+connecting-line visual (ported from mobile prototype) applies at **all** breakpoints — pure visual upgrade, not mobile-only. |
 | D8 | Navigation stays flat top-app-bar + back button at all breakpoints. No bottom tab bar, no drawer — IA has no parallel top-level sections to tab between. |
-| D9 | Resolve-confirmation bottom sheet and Archive search/filter are **out of scope** until Product Spec Agent sign-off (functional changes, not layout adaptation — see Open Questions). |
+| D9 | Archive search/filter is **out of scope** until Product Spec Agent sign-off (a functional change, not layout adaptation — see Open Questions). |
+| D10 | **Workflow preservation is the governing constraint for all mobile work**: screen hierarchy, navigation hierarchy, workflow sequence, and user mental model must match desktop. No mobile-only workflow changes (mode-switching tabs, reordered content relative to desktop's reading order, added confirmation steps) without cross-platform parity (built on desktop too) and Product Spec Agent sign-off. Mobile usability is improved only via layout repositioning and information-hierarchy changes (summarization, inline expansion, bottom sheets) — never by diverging the interaction model from desktop. |
+| D11 | Sticky bottom action bars (always-visible primary action, e.g. Registration's submit, Workspace's resolve/close) are a **Layout Change** (position only — same action, same order) and need no sign-off. |
+| D12 | A confirmation step before Mark Resolved/Close, and before committing an Analysis fix-flow selection, were evaluated and are **not recommended**: desktop has no equivalent step, and adding one mobile-only would violate D10. Current single-tap behavior is unchanged on all breakpoints. |
 
 # Requirements
 
@@ -39,21 +42,19 @@ Sentinel's Flutter app currently has **no responsive logic anywhere** (no `Media
 - No existing DS component is breakpoint-aware; every item above is net-new logic, not a tuning pass.
 - Files requiring direct changes: `design_system/components/layout/sentinel_scaffold.dart`, `design_system/components/layout/two_panel_layout.dart`, `features/dashboard/presentation/screens/dashboard_screen.dart`, `features/incident/presentation/shared/widgets/incident_detail_dialog.dart`.
 - New token file: `design_system/tokens/breakpoints.dart`.
-- Mobile prototype patterns adopted: top app-bar (not bottom tabs), card-list for tabular data, bottom sheets for detail "peeks", dot+line timeline, full-row checklist tap targets (≥44px).
+- Mobile prototype patterns adopted: top app-bar (not bottom tabs), card-list for tabular data, bottom sheets for detail "peeks", dot+line timeline, full-row checklist tap targets (≥44px), sticky bottom action bars for primary actions.
 - Mobile prototype patterns rejected: its color palette/iconography (different token set than `AppColors`), its auth field ordering/copy, its 2-step signup indicator (unverified against `07_auth_spec.md`).
 
 # Roadmap
 
-1. **Phase 1 — Critical fixes:** breakpoint tokens; `SentinelScaffold`/`TwoPanelLayout` responsive behavior; Dashboard board stacking; Archive horizontal-scroll stopgap; relative-width auth cards. No overflow/breakage at any width.
-2. **Phase 2 — Mobile UX:** Archive card-list; bottom-sheet detail dialog; Dashboard header redesign; timeline dot+line (all breakpoints); tablet `TwoPanelLayout` ratio; checklist touch-target sizing.
-3. **Phase 3 — Advanced (needs Product Spec Agent sign-off):** resolve-confirmation step + success state; Archive search/filter; persistent bottom CTA bar on Analysis.
+1. **Phase 1 — Critical fixes:** breakpoint tokens; `SentinelScaffold`/`TwoPanelLayout` responsive behavior; Dashboard board stacking; Archive horizontal-scroll stopgap; relative-width auth cards. No overflow/breakage at any width. *(Shipped.)*
+2. **Phase 2 — Mobile UX (validated, no sign-off required — all Layout or Information Hierarchy changes per D10):** Archive card-list; bottom-sheet detail dialog; Dashboard header redesign + FAB for Register + pull-to-refresh + elapsed-time chip on `IncidentCard`; timeline dot+line (all breakpoints); Workspace timeline summarized to last 2–3 events with a "View full timeline" bottom sheet (see [Incident Flow spec](./10_4_responsive_incident_flow.md)); Workspace Notes collapse/expand; sticky bottom action bars (Registration submit, Workspace resolve/close); tablet `TwoPanelLayout` ratio; checklist touch-target sizing.
+3. **Phase 3 — Needs Product Spec Agent sign-off:** Archive search/filter only. (Resolve/fix-flow confirmation steps were evaluated and are not recommended per D12 — removed from this roadmap, not deferred.)
 
 # Open Questions (Product Spec Agent)
 
-1. Is "Mark as Resolved" confirmation mobile-only or a universal behavior change?
-2. Is Archive search/filter an approved feature or prototype-only speculation?
-3. Is signup genuinely 2-step (password+OTP), matching `07_auth_spec.md`, or a prototype simplification?
-4. Should the post-resolve success screen exist on desktop too, or stay mobile-only?
+1. Is Archive search/filter an approved feature or prototype-only speculation?
+2. Is signup genuinely 2-step (password+OTP), matching `07_auth_spec.md`, or a prototype simplification?
 
 # References
 
