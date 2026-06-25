@@ -1,0 +1,25 @@
+
+# 도커 이미지 빌드 (캐쉬 삭제하고 다시 빌드)
+docker build --no-cache -t backend:latest .
+
+# 태그 생성
+docker tag backend:latest `
+  asia-northeast3-docker.pkg.dev/sentinel-mvp-497609/sentinel/backend:latest
+
+# gCloud 진입(한번 하면 생략 가능)
+gcloud auth login
+gcloud auth configure-docker asia-northeast3-docker.pkg.dev
+
+# docker 이미지 gCloude에 푸쉬
+docker push asia-northeast3-docker.pkg.dev/sentinel-mvp-497609/sentinel/backend:latest
+
+# gcloud 배포 (환경변수 주입도 추가해주기)
+gcloud run deploy sentinel-backend `
+  --image asia-northeast3-docker.pkg.dev/sentinel-mvp-497609/sentinel/backend:latest `
+  --region asia-northeast3 `
+  --platform managed `
+  --allow-unauthenticated
+
+# gCloud 로그 찍어보기 (정상적으로 앱이 실행됐는지 확인)
+gcloud run services logs read sentinel-backend `
+ --region asia-northeast3

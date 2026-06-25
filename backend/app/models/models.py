@@ -1,7 +1,7 @@
 """SQLAlchemy ORM models. Must match sdd/06_database_schema.md exactly."""
 from datetime import datetime, timezone
 from uuid import uuid4, uuid5, NAMESPACE_URL
-from sqlalchemy import String, Text, Numeric, Boolean, SmallInteger, JSON, ForeignKey, UniqueConstraint, TypeDecorator
+from sqlalchemy import DateTime, String, Text, Numeric, Boolean, SmallInteger, JSON, ForeignKey, UniqueConstraint, TypeDecorator
 from sqlalchemy.dialects.postgresql import ARRAY as PG_ARRAY
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
@@ -48,7 +48,7 @@ class User(Base):
     user_id: Mapped[str] = mapped_column(String(36), primary_key=True)
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
     password: Mapped[str] = mapped_column(String(255), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(default=_now)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
 
 class Incident(Base):
@@ -68,9 +68,9 @@ class Incident(Base):
     # the circular dependency between incidents↔fix_flows that requires ALTER TABLE,
     # which SQLite does not support.
     selected_fix_flow_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
-    resolved_at: Mapped[datetime | None] = mapped_column(nullable=True)
-    created_at: Mapped[datetime] = mapped_column(default=_now)
-    updated_at: Mapped[datetime] = mapped_column(default=_now, onupdate=_now)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
 
     fix_flows: Mapped[list["FixFlow"]] = relationship("FixFlow", foreign_keys="FixFlow.incident_id", back_populates="incident", cascade="all, delete-orphan")
     timeline: Mapped[list["TimelineEvent"]] = relationship(back_populates="incident", cascade="all, delete-orphan", order_by="TimelineEvent.occurred_at")
@@ -86,7 +86,7 @@ class FixFlow(Base):
     confidence: Mapped[float] = mapped_column(Numeric(4, 3), nullable=False)
     is_attempted: Mapped[bool] = mapped_column(Boolean, default=False)
     sort_order: Mapped[int] = mapped_column(SmallInteger, default=0)
-    created_at: Mapped[datetime] = mapped_column(default=_now)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
     incident: Mapped["Incident"] = relationship("Incident", foreign_keys=[incident_id], back_populates="fix_flows")
     checklist_items: Mapped[list["ChecklistItem"]] = relationship(back_populates="fix_flow", cascade="all, delete-orphan", order_by="ChecklistItem.step_number")
@@ -99,7 +99,7 @@ class ChecklistItem(Base):
     step_number: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
     is_completed: Mapped[bool] = mapped_column(Boolean, default=False)
-    updated_at: Mapped[datetime] = mapped_column(default=_now, onupdate=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
 
     fix_flow: Mapped["FixFlow"] = relationship(back_populates="checklist_items")
 
@@ -109,7 +109,7 @@ class Note(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
     incident_id: Mapped[str] = mapped_column(String(36), ForeignKey("incidents.id", ondelete="CASCADE"), nullable=False, unique=True)
     content: Mapped[str] = mapped_column(Text, default="")
-    updated_at: Mapped[datetime] = mapped_column(default=_now, onupdate=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
 
     incident: Mapped["Incident"] = relationship(back_populates="note")
 
@@ -119,7 +119,7 @@ class TimelineEvent(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
     incident_id: Mapped[str] = mapped_column(String(36), ForeignKey("incidents.id", ondelete="CASCADE"), nullable=False, index=True)
     event: Mapped[str] = mapped_column(Text, nullable=False)
-    occurred_at: Mapped[datetime] = mapped_column(default=_now)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
     incident: Mapped["Incident"] = relationship(back_populates="timeline")
 
@@ -131,7 +131,7 @@ class SimilarIncident(Base):
     incident_id: Mapped[str] = mapped_column(String(36), ForeignKey("incidents.id", ondelete="CASCADE"), nullable=False, index=True)
     similar_to_id: Mapped[str] = mapped_column(String(36), ForeignKey("incidents.id", ondelete="CASCADE"), nullable=False)
     match_score: Mapped[float] = mapped_column(Numeric(4, 3), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(default=_now)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
     incident: Mapped["Incident"] = relationship("Incident", foreign_keys=[incident_id], back_populates="similar_incidents")
     similar_to: Mapped["Incident"] = relationship("Incident", foreign_keys=[similar_to_id])

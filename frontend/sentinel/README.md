@@ -43,3 +43,26 @@ flutter run -d chrome `
   --dart-define=SUPABASE_URL=https://cemeuqlytgsiofnpxcui.supabase.co `
   --dart-define=SUPABASE_ANON_KEY=sb_publishable_iNrg7X3vdsp7M6IaNZayug_4t6Fr5o3
 ```
+
+**hosting mode** (FastAPI + SQLite):
+```
+-- 실행
+flutter run -d chrome `
+  --web-port=51302 `
+  --dart-define=AUTH_PROVIDER=supabase `
+  --dart-define=API_BASE_URL=https://sentinel-backend-106332252466.asia-northeast3.run.app `
+  --dart-define=USE_MOCK_DATA=false `
+  --dart-define=SUPABASE_URL=https://cemeuqlytgsiofnpxcui.supabase.co `
+  --dart-define=SUPABASE_ANON_KEY=sb_publishable_iNrg7X3vdsp7M6IaNZayug_4t6Fr5o3
+
+-- 빌드
+flutter build web `
+  --dart-define=AUTH_PROVIDER=supabase `
+  --dart-define=API_BASE_URL=https://sentinel-backend-106332252466.asia-northeast3.run.app `
+  --dart-define=USE_MOCK_DATA=false `
+  --dart-define=SUPABASE_URL=https://cemeuqlytgsiofnpxcui.supabase.co `
+  --dart-define=SUPABASE_ANON_KEY=sb_publishable_iNrg7X3vdsp7M6IaNZayug_4t6Fr5o3
+
+-- 배포
+firebase deploy
+```
