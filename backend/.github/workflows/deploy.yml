@@ -1,0 +1,205 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Sentinel API — CI/CD: build → migrate → deploy to Google Cloud Run
+#
+# Trigger: push to `main` branch (production deploys only)
+#
+# Deployment order (safe, zero-downtime):
+#   1. Build Docker image and push to Artifact Registry
+#   2. Run `alembic upgrade head` via a Cloud Run Job (separate from the service)
+#      — uses the DIRECT connection URL (MIGRATION_DATABASE_URL), not the pooler
+#      — Alembic's table lock prevents concurrent migration races
+#   3. Deploy the new image to the Cloud Run Service
+#      — Cloud Run keeps the old revision alive until the new one is healthy
+#      — Traffic shifts only after the new revision passes the startup probe
+#
+# Authentication: Workload Identity Federation (no long-lived service-account keys)
+#
+# Required GitHub secrets (Settings → Secrets → Actions):
+#   WIF_PROVIDER          Workload Identity provider resource name
+#                         projects/<NUM>/locations/global/workloadIdentityPools/<POOL>/providers/<PROVIDER>
+#   WIF_SERVICE_ACCOUNT   CI/CD service account email
+#                         github-actions@<PROJECT_ID>.iam.gserviceaccount.com
+#
+# Required GitHub variables (Settings → Variables → Actions):
+#   GCP_PROJECT_ID        e.g. sentinel-prod-123456
+#   GCP_REGION            e.g. us-central1
+#   GAR_REPOSITORY        Artifact Registry repo name, e.g. sentinel
+#
+# Secrets stored in Google Secret Manager (same names as env vars):
+#   DATABASE_URL              postgresql+asyncpg:// transaction-pooler URL
+#   MIGRATION_DATABASE_URL    postgresql:// direct-connection URL (port 5432)
+#   SUPABASE_URL              https://<ref>.supabase.co
+#   SUPABASE_JWT_SECRET       Supabase project JWT secret
+#   GEMINI_API_KEY            Google AI Studio API key
+#
+# See docs/deployment.md for first-time GCP setup instructions.
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: Deploy to Cloud Run
+
+on:
+  push:
+    branches:
+      - main
+  # Allow manual trigger from the Actions tab
+  workflow_dispatch:
+
+# Cancel any in-progress deploy for the same branch so we never have two
+# deployments racing each other.
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PROJECT_ID:     ${{ vars.GCP_PROJECT_ID }}
+  REGION:         ${{ vars.GCP_REGION }}
+  GAR_REPOSITORY: ${{ vars.GAR_REPOSITORY }}
+  SERVICE_NAME:   sentinel-api
+  JOB_NAME:       sentinel-migrate
+  # Full image path is assembled in the build step
+  IMAGE_BASE:     ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GAR_REPOSITORY }}/sentinel-api
+
+jobs:
+  deploy:
+    name: Build · Migrate · Deploy
+    runs-on: ubuntu-latest
+
+    # id-token: write is required for Workload Identity Federation
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      # ── 1. Checkout ─────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── 2. Authenticate to GCP via Workload Identity Federation ─────────────
+      - name: Authenticate to Google Cloud
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account:            ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      # ── 3. Set up gcloud CLI ─────────────────────────────────────────────────
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+
+      # ── 4. Configure Docker to push to Artifact Registry ────────────────────
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      # ── 5. Build and push Docker image ───────────────────────────────────────
+      # Tag with both the commit SHA (immutable, used for this deploy) and
+      # `latest` (mutable, useful for ad-hoc pulls).
+      - name: Build and push image
+        id: build
+        run: |
+          SHA_IMAGE="${{ env.IMAGE_BASE }}:${{ github.sha }}"
+          LATEST_IMAGE="${{ env.IMAGE_BASE }}:latest"
+
+          docker build \
+            --tag "$SHA_IMAGE" \
+            --tag "$LATEST_IMAGE" \
+            --label "git.sha=${{ github.sha }}" \
+            --label "git.ref=${{ github.ref_name }}" \
+            .
+
+          docker push "$SHA_IMAGE"
+          docker push "$LATEST_IMAGE"
+
+          echo "sha_image=$SHA_IMAGE" >> "$GITHUB_OUTPUT"
+
+      # ── 6. Create or update the migration Cloud Run Job ─────────────────────
+      # The Job runs `scripts/migrate.sh` (alembic upgrade head) using the direct
+      # Supabase connection before the new service revision goes live.
+      # We upsert rather than always-create so the first run creates and
+      # subsequent runs just update the image.
+      - name: Upsert migration Cloud Run Job
+        run: |
+          SHA_IMAGE="${{ steps.build.outputs.sha_image }}"
+
+          if gcloud run jobs describe "${{ env.JOB_NAME }}" \
+               --region "${{ env.REGION }}" \
+               --quiet 2>/dev/null; then
+            echo "Updating existing migration job..."
+            gcloud run jobs update "${{ env.JOB_NAME }}" \
+              --image       "$SHA_IMAGE" \
+              --region      "${{ env.REGION }}" \
+              --quiet
+          else
+            echo "Creating migration job for the first time..."
+            gcloud run jobs create "${{ env.JOB_NAME }}" \
+              --image       "$SHA_IMAGE" \
+              --region      "${{ env.REGION }}" \
+              --command     "scripts/migrate.sh" \
+              --task-timeout 300 \
+              --max-retries  0 \
+              --set-env-vars APP_ENV=production \
+              --set-secrets  MIGRATION_DATABASE_URL=MIGRATION_DATABASE_URL:latest \
+              --quiet
+          fi
+
+      # ── 7. Run database migrations ───────────────────────────────────────────
+      # --wait blocks until the Job execution finishes.
+      # The step fails (and the deploy is aborted) if the migration fails.
+      - name: Run database migrations
+        run: |
+          gcloud run jobs execute "${{ env.JOB_NAME }}" \
+            --region "${{ env.REGION }}" \
+            --wait \
+            --quiet
+          echo "✅ Migrations completed successfully."
+
+      # ── 8. Deploy the Cloud Run Service ─────────────────────────────────────
+      # --no-traffic deploys without shifting traffic, letting the revision
+      # complete its startup probe first.  Traffic is migrated in the next step.
+      - name: Deploy new Cloud Run revision (no traffic)
+        id: deploy
+        run: |
+          SHA_IMAGE="${{ steps.build.outputs.sha_image }}"
+
+          gcloud run deploy "${{ env.SERVICE_NAME }}" \
+            --image    "$SHA_IMAGE" \
+            --region   "${{ env.REGION }}" \
+            --platform managed \
+            --no-traffic \
+            --set-env-vars "\
+          APP_ENV=production,\
+          SKIP_EMAIL_VERIFICATION=false,\
+          WEB_CONCURRENCY=1" \
+            --set-secrets "\
+          DATABASE_URL=DATABASE_URL:latest,\
+          SUPABASE_URL=SUPABASE_URL:latest,\
+          SUPABASE_JWT_SECRET=SUPABASE_JWT_SECRET:latest,\
+          GEMINI_API_KEY=GEMINI_API_KEY:latest" \
+            --allow-unauthenticated \
+            --min-instances  0 \
+            --max-instances  10 \
+            --concurrency    80 \
+            --cpu            1 \
+            --memory         512Mi \
+            --timeout        300 \
+            --quiet
+
+      # ── 9. Migrate traffic to the new revision ───────────────────────────────
+      # LATEST means "the revision we just deployed".  Only runs if step 8 passed.
+      - name: Migrate traffic to new revision
+        run: |
+          gcloud run services update-traffic "${{ env.SERVICE_NAME }}" \
+            --region  "${{ env.REGION }}" \
+            --to-latest \
+            --quiet
+          echo "✅ Traffic shifted to new revision."
+
+      # ── 10. Print the service URL ────────────────────────────────────────────
+      - name: Print service URL
+        run: |
+          URL=$(gcloud run services describe "${{ env.SERVICE_NAME }}" \
+                  --region "${{ env.REGION }}" \
+                  --format "value(status.url)")
+          echo "🚀 Deployed: $URL"
+          echo "   Health:   $URL/health"

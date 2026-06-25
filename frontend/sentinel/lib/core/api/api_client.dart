@@ -37,6 +37,7 @@ Future<String?> _resolveToken(Ref ref) async {
   // Supabase needs its own path to handle token refresh before reading.
   if (AppConfig.authProvider == AuthProviderMode.supabase) {
     final session = Supabase.instance.client.auth.currentSession;
+
     if (session != null && session.isExpired) {
       try {
         await Supabase.instance.client.auth.refreshSession();
