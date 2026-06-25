@@ -86,8 +86,10 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     return SentinelScaffold(
       padding: EdgeInsets.zero,
       body: Center(
-        child: SizedBox(
-          width: 400,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+          child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 440),
           child: Container(
             padding: const EdgeInsets.all(40),
             decoration: BoxDecoration(
@@ -174,6 +176,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                 ],
               ],
             ),
+          ),
           ),
         ),
       ),

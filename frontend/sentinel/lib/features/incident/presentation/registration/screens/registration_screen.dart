@@ -20,25 +20,72 @@ class RegistrationScreen extends ConsumerWidget {
       }
     });
 
+    final isMobile = context.isMobileWidth;
+    final formState = ref.watch(registrationFormProvider);
+    void onSubmit() => ref.read(registrationFormProvider.notifier).submit();
+    final metadataPanel = MetadataPanel(onSubmit: onSubmit);
+
     return SentinelScaffold(
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _Header(),
           const SizedBox(height: AppSpacing.md),
+          if (isMobile) const _CompactGuideHeading(),
+          if (isMobile) const SizedBox(height: AppSpacing.md),
           Expanded(
-            child: TwoPanelLayout(
-              leftFlex: 30,
-              rightFlex: 70,
-              left: const _GuidePanel(),
-              right: MetadataPanel(
-                onSubmit: () =>
-                    ref.read(registrationFormProvider.notifier).submit(),
-              ),
-            ),
+            child: isMobile
+                ? metadataPanel
+                : TwoPanelLayout(
+                    leftFlex: 30,
+                    rightFlex: 70,
+                    left: const _GuidePanel(),
+                    right: metadataPanel,
+                  ),
           ),
+          // Mobile-only sticky submit bar — Layout Change (D11): same submit
+          // action MetadataPanel's desktop footer already has, just always
+          // reachable without scrolling (10_4_responsive_incident_flow.md).
+          if (isMobile)
+            StickyActionBar(
+              children: [
+                if (formState.submitError != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+                    child: Text(
+                      formState.submitError!,
+                      style: AppText.bodySmall.copyWith(color: AppColors.severityCritical),
+                    ),
+                  ),
+                PrimaryButton(
+                  label: formState.isSubmitting ? 'Creating...' : 'Create Incident',
+                  onPressed: formState.isSubmitting ? () {} : onSubmit,
+                ),
+              ],
+            ),
         ],
       ),
+    );
+  }
+}
+
+// ── Compact guide heading (mobile only) ───────────────────────────────────────
+
+class _CompactGuideHeading extends StatelessWidget {
+  const _CompactGuideHeading();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('How it works', style: AppText.titleMedium),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          'Paste your log below — AI suggests a title, severity, and components. Review and create the incident.',
+          style: AppText.bodySmall.copyWith(color: AppColors.textMuted),
+        ),
+      ],
     );
   }
 }

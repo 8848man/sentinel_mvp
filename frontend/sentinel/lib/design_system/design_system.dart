@@ -4,6 +4,7 @@
 export 'tokens/colors.dart';
 export 'tokens/typography.dart';
 export 'tokens/spacing.dart';
+export 'tokens/breakpoints.dart';
 
 export 'components/buttons/primary_button.dart';
 export 'components/buttons/secondary_button.dart';
@@ -21,3 +22,4 @@ export 'components/chips/component_chip.dart';
 
 export 'components/layout/two_panel_layout.dart';
 export 'components/layout/sentinel_scaffold.dart';
+export 'components/layout/sticky_action_bar.dart';

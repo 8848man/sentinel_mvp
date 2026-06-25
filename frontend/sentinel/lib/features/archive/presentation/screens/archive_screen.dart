@@ -28,9 +28,19 @@ class ArchiveScreen extends ConsumerWidget {
               error: (_, __) => _ErrorView(
                 onRetry: () => ref.read(archiveProvider.notifier).reload(),
               ),
-              data: (incidents) => incidents.isEmpty
-                  ? _EmptyView()
-                  : _ArchiveTable(incidents: incidents),
+              data: (incidents) {
+                final table = incidents.isEmpty
+                    ? _EmptyView()
+                    : _ArchiveTable(incidents: incidents);
+                // Pull-to-refresh mirrors Dashboard's mobile-gated affordance
+                // (10_5_responsive_archive.md) — desktop/tablet stay untouched.
+                if (!context.isMobileWidth) return table;
+                return RefreshIndicator(
+                  color: AppColors.accentBlue,
+                  onRefresh: () => ref.read(archiveProvider.notifier).reload(),
+                  child: table,
+                );
+              },
             ),
           ),
         ],
@@ -70,7 +80,12 @@ class _ArchiveTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    // <768px: card list (sdd/frontend/10_5_responsive_archive.md, D1).
+    if (context.isMobileWidth) {
+      return _ArchiveCardList(incidents: incidents);
+    }
+
+    final table = Container(
       decoration: BoxDecoration(
         color: AppColors.bgCard,
         borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
@@ -89,6 +104,113 @@ class _ArchiveTable extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+
+    // 768-1199px: keep the table, horizontal-scroll fallback instead of a
+    // redesign (D2). The table needs a definite width for its flex columns
+    // once it's inside a horizontally-unbounded scroll view, and a definite
+    // height carried over from the available space (the Expanded ListView
+    // inside `table` needs a bounded height to lay out).
+    if (context.isTabletWidth) {
+      return LayoutBuilder(
+        builder: (context, constraints) => SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: SizedBox(
+            width: 900,
+            height: constraints.maxHeight,
+            child: table,
+          ),
+        ),
+      );
+    }
+
+    return table;
+  }
+}
+
+// ── Card list (<768px) ────────────────────────────────────────────────────────
+
+class _ArchiveCardList extends StatelessWidget {
+  const _ArchiveCardList({required this.incidents});
+  final List<Incident> incidents;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.builder(
+      itemCount: incidents.length,
+      itemBuilder: (context, i) => _ArchiveCard(incident: incidents[i]),
+    );
+  }
+}
+
+class _ArchiveCard extends StatelessWidget {
+  const _ArchiveCard({required this.incident});
+  final Incident incident;
+
+  @override
+  Widget build(BuildContext context) {
+    final resolvedLabel = incident.resolvedAt != null
+        ? DateFormat('MMM d, HH:mm').format(incident.resolvedAt!.toLocal())
+        : '—';
+
+    return InkWell(
+      onTap: () => showIncidentDetailDialog(context, incident.id),
+      borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+        padding: const EdgeInsets.all(AppSpacing.cardPadding),
+        decoration: BoxDecoration(
+          color: AppColors.bgCard,
+          borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(incident.incidentCode,
+                          style: AppText.monoBody
+                              .copyWith(color: AppColors.accentBlue)),
+                      const SizedBox(width: AppSpacing.xs),
+                      StatusBadge(status: incident.status),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(incident.title,
+                      style: AppText.titleMedium,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis),
+                  const SizedBox(height: AppSpacing.xs),
+                  Row(
+                    children: [
+                      const Icon(Icons.access_time,
+                          size: 12, color: AppColors.textMuted),
+                      const SizedBox(width: 4),
+                      Text(resolvedLabel,
+                          style: AppText.bodySmall
+                              .copyWith(color: AppColors.textMuted)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                SeverityBadge(severity: incident.severity),
+                const SizedBox(height: AppSpacing.sm),
+                const Icon(Icons.chevron_right,
+                    size: 18, color: AppColors.textFaint),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

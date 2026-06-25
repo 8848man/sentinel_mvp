@@ -43,9 +43,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     return SentinelScaffold(
       padding: EdgeInsets.zero,
       body: Center(
-        child: SizedBox(
-          width: 400,
-          child: Container(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 440),
+            child: Container(
             padding: const EdgeInsets.all(40),
             decoration: BoxDecoration(
               color: AppColors.bgCard,
@@ -107,6 +109,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 //   ],
                 // ),
               ],
+            ),
             ),
           ),
         ),

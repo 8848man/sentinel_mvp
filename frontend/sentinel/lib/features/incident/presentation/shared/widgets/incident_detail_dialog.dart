@@ -1,25 +1,103 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 import '../../../../../design_system/design_system.dart';
 import '../../../domain/entities/incident.dart';
 import '../providers/incident_detail_provider.dart';
+import 'timeline_list.dart';
 
+/// Opens the incident detail view as a bottom sheet on mobile (<768px) or a
+/// centered dialog on tablet/desktop (sdd/frontend/10_6_responsive_auth_dialogs.md, D6).
 void showIncidentDetailDialog(BuildContext context, String incidentId) {
+  if (context.isMobileWidth) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => DraggableScrollableSheet(
+        initialChildSize: 0.85,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        expand: false,
+        builder: (context, scrollController) => _BottomSheetFrame(
+          child: IncidentDetailDialog(
+            incidentId: incidentId,
+            stacked: true,
+            scrollController: scrollController,
+          ),
+        ),
+      ),
+    );
+    return;
+  }
+
   showDialog<void>(
     context: context,
-    builder: (_) => IncidentDetailDialog(incidentId: incidentId),
+    builder: (_) => IncidentDetailDialog(incidentId: incidentId, stacked: false),
   );
 }
 
+class _BottomSheetFrame extends StatelessWidget {
+  const _BottomSheetFrame({required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppColors.bgCard,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppSpacing.cardRadius)),
+      ),
+      child: Column(
+        children: [
+          const SizedBox(height: AppSpacing.sm),
+          Container(
+            width: 36,
+            height: 4,
+            decoration: BoxDecoration(
+              color: AppColors.border,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Expanded(child: child),
+        ],
+      ),
+    );
+  }
+}
+
 class IncidentDetailDialog extends ConsumerWidget {
-  const IncidentDetailDialog({super.key, required this.incidentId});
+  const IncidentDetailDialog({
+    super.key,
+    required this.incidentId,
+    this.stacked = false,
+    this.scrollController,
+  });
 
   final String incidentId;
+  final bool stacked;
+  final ScrollController? scrollController;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final asyncIncident = ref.watch(incidentDetailProvider(incidentId));
+
+    final content = asyncIncident.when(
+      loading: () => const Center(
+        child: CircularProgressIndicator(color: AppColors.accentBlue),
+      ),
+      error: (_, __) => Center(
+        child: Text('Failed to load incident.',
+            style: AppText.bodyMedium.copyWith(color: AppColors.textMuted)),
+      ),
+      data: (incident) => _DialogContent(
+        incident: incident,
+        stacked: stacked,
+        scrollController: scrollController,
+      ),
+    );
+
+    if (stacked) return content;
 
     return Dialog(
       backgroundColor: AppColors.bgCard,
@@ -28,17 +106,7 @@ class IncidentDetailDialog extends ConsumerWidget {
       child: SizedBox(
         width: MediaQuery.of(context).size.width * 0.70,
         height: MediaQuery.of(context).size.height * 0.60,
-        child: asyncIncident.when(
-          loading: () => const Center(
-            child: CircularProgressIndicator(color: AppColors.accentBlue),
-          ),
-          error: (_, __) => Center(
-            child: Text('Failed to load incident.',
-                style: AppText.bodyMedium
-                    .copyWith(color: AppColors.textMuted)),
-          ),
-          data: (incident) => _DialogContent(incident: incident),
-        ),
+        child: content,
       ),
     );
   }
@@ -47,26 +115,46 @@ class IncidentDetailDialog extends ConsumerWidget {
 // ── Content ───────────────────────────────────────────────────────────────────
 
 class _DialogContent extends StatelessWidget {
-  const _DialogContent({required this.incident});
+  const _DialogContent({
+    required this.incident,
+    required this.stacked,
+    this.scrollController,
+  });
+
   final Incident incident;
+  final bool stacked;
+  final ScrollController? scrollController;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        _DialogHeader(incident: incident),
-        const Divider(color: AppColors.border, height: 1),
-        Expanded(
-          child: Padding(
+    final body = stacked
+        ? SingleChildScrollView(
+            controller: scrollController,
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _TimelinePanel(incident: incident, stacked: true),
+                const SizedBox(height: AppSpacing.lg),
+                _SummaryPanel(incident: incident),
+              ],
+            ),
+          )
+        : Padding(
             padding: const EdgeInsets.all(AppSpacing.md),
             child: TwoPanelLayout(
               leftFlex: 40,
               rightFlex: 60,
-              left: _TimelinePanel(incident: incident),
+              left: _TimelinePanel(incident: incident, stacked: false),
               right: _SummaryPanel(incident: incident),
             ),
-          ),
-        ),
+          );
+
+    return Column(
+      children: [
+        _DialogHeader(incident: incident),
+        const Divider(color: AppColors.border, height: 1),
+        Expanded(child: body),
       ],
     );
   }
@@ -111,8 +199,9 @@ class _DialogHeader extends StatelessWidget {
 // ── Timeline panel ────────────────────────────────────────────────────────────
 
 class _TimelinePanel extends StatelessWidget {
-  const _TimelinePanel({required this.incident});
+  const _TimelinePanel({required this.incident, required this.stacked});
   final Incident incident;
+  final bool stacked;
 
   @override
   Widget build(BuildContext context) {
@@ -121,26 +210,7 @@ class _TimelinePanel extends StatelessWidget {
       children: [
         Text('Timeline', style: AppText.titleMedium),
         const SizedBox(height: AppSpacing.sm),
-        Expanded(
-          child: incident.timeline.isEmpty
-              ? Text('No events recorded.',
-                  style: AppText.bodySmall)
-              : ListView.separated(
-                  itemCount: incident.timeline.length,
-                  separatorBuilder: (_, __) =>
-                      const SizedBox(height: AppSpacing.xs),
-                  itemBuilder: (_, i) {
-                    final event = incident.timeline[i];
-                    final time =
-                        DateFormat('HH:mm').format(event.occurredAt.toLocal());
-                    return Text(
-                      '$time — ${event.event}',
-                      style: AppText.bodySmall
-                          .copyWith(color: AppColors.textPrimary),
-                    );
-                  },
-                ),
-        ),
+        TimelineList(events: incident.timeline, shrinkWrap: stacked),
       ],
     );
   }
