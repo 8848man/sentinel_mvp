@@ -10,6 +10,7 @@ import '../widgets/checklist_item_widget.dart';
 import '../../analysis/providers/analysis_provider.dart';
 import '../../shared/widgets/timeline_list.dart';
 import '../../shared/widgets/full_timeline_sheet.dart';
+import '../../shared/widgets/incident_context_header.dart';
 
 class WorkspaceScreen extends ConsumerStatefulWidget {
   const WorkspaceScreen({super.key, required this.incidentId});
@@ -154,6 +155,22 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Mobile AppBar Hierarchy (D13, sdd/frontend/10_2_responsive_strategy.md):
+    // the header is navigation/page-context only on mobile — incident code
+    // and title render in the page content instead (see _LeftPanel).
+    if (context.isMobileWidth) {
+      return Row(
+        children: [
+          GhostButton(
+            label: '← Dashboard',
+            onPressed: () => context.go('/dashboard'),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Text('Workspace', style: AppText.headlineLarge),
+        ],
+      );
+    }
+
     return Row(
       children: [
         GhostButton(
@@ -293,6 +310,12 @@ class _LeftPanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Incident title + ID, moved here from the header on mobile (D13).
+          if (stacked)
+            IncidentContextHeader(
+              title: incident.title,
+              incidentCode: incident.incidentCode,
+            ),
           // Badges
           Row(
             children: [

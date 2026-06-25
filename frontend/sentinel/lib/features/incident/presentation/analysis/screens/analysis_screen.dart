@@ -8,6 +8,7 @@ import '../../workspace/providers/workspace_provider.dart';
 import '../widgets/fix_flow_row.dart';
 import '../widgets/similar_incident_item.dart';
 import '../../shared/widgets/incident_detail_dialog.dart';
+import '../../shared/widgets/incident_context_header.dart';
 
 class AnalysisScreen extends ConsumerWidget {
   const AnalysisScreen({super.key, required this.incidentId});
@@ -73,6 +74,22 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Mobile AppBar Hierarchy (D13, sdd/frontend/10_2_responsive_strategy.md):
+    // the header is navigation/page-context only on mobile — incident code
+    // and title render in the page content instead (see _LeftPanel).
+    if (context.isMobileWidth) {
+      return Row(
+        children: [
+          GhostButton(
+            label: '← Dashboard',
+            onPressed: () => context.go('/dashboard'),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Text('AI Analysis', style: AppText.headlineLarge),
+        ],
+      );
+    }
+
     return Row(
       children: [
         GhostButton(
@@ -182,6 +199,12 @@ class _LeftPanelState extends State<_LeftPanel> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Incident title + ID, moved here from the header on mobile (D13).
+          if (widget.stacked)
+            IncidentContextHeader(
+              title: incident.title,
+              incidentCode: incident.incidentCode,
+            ),
           Text('Likely Root Cause', style: AppText.titleMedium),
           const SizedBox(height: AppSpacing.sm),
           Text(

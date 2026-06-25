@@ -25,12 +25,13 @@ Sentinel's Flutter app currently has **no responsive logic anywhere** (no `Media
 | D10 | **Workflow preservation is the governing constraint for all mobile work**: screen hierarchy, navigation hierarchy, workflow sequence, and user mental model must match desktop. No mobile-only workflow changes (mode-switching tabs, reordered content relative to desktop's reading order, added confirmation steps) without cross-platform parity (built on desktop too) and Product Spec Agent sign-off. Mobile usability is improved only via layout repositioning and information-hierarchy changes (summarization, inline expansion, bottom sheets) — never by diverging the interaction model from desktop. |
 | D11 | Sticky bottom action bars (always-visible primary action, e.g. Registration's submit, Workspace's resolve/close) are a **Layout Change** (position only — same action, same order) and need no sign-off. |
 | D12 | A confirmation step before Mark Resolved/Close, and before committing an Analysis fix-flow selection, were evaluated and are **not recommended**: desktop has no equivalent step, and adding one mobile-only would violate D10. Current single-tap behavior is unchanged on all breakpoints. |
+| D13 | **Mobile AppBar Hierarchy** (Information Hierarchy Change): <768px, the top app-bar/header row is reserved for navigation and page context only — back button, page type (Incident/Analysis/Workspace/Archive), and navigation/menu actions. It must not carry incident-specific content (incident title, incident ID, or other incident metadata): that competes with navigation for width and causes overflow/truncation. Incident title and incident ID move into the page content area instead (top of the first content section). Desktop/tablet headers are unchanged — there's no width pressure at those breakpoints, so this is mobile-only. |
 
 # Requirements
 
 | Area | Mobile (0–767) | Tablet (768–1199) | Desktop (1200+) |
 |---|---|---|---|
-| Navigation | Top app-bar, icon-only actions | Top app-bar, icon+label actions | Unchanged (current) |
+| Navigation | Top app-bar, icon-only actions, nav/page-context only (D13) | Top app-bar, icon+label actions, current content unchanged | Unchanged (current) |
 | Two-panel screens | Single column, left-panel content first | Side-by-side, flex ~38/62 | Side-by-side, flex 28/72 (current) |
 | Dashboard board | Stacked sections | Stacked <900px, 3-col ≥900px | 3-col row (current) |
 | Archive | Card list | Table + horizontal scroll fallback | Table (current) |
@@ -44,6 +45,7 @@ Sentinel's Flutter app currently has **no responsive logic anywhere** (no `Media
 - New token file: `design_system/tokens/breakpoints.dart`.
 - Mobile prototype patterns adopted: top app-bar (not bottom tabs), card-list for tabular data, bottom sheets for detail "peeks", dot+line timeline, full-row checklist tap targets (≥44px), sticky bottom action bars for primary actions.
 - Mobile prototype patterns rejected: its color palette/iconography (different token set than `AppColors`), its auth field ordering/copy, its 2-step signup indicator (unverified against `07_auth_spec.md`).
+- D13 touches the `_Header` widgets in `analysis_screen.dart` and `workspace_screen.dart` (currently back button + incident code + incident title in one `Row`, which overflows on mobile) — see [Incident Flow spec](./10_4_responsive_incident_flow.md) for the per-screen breakdown of where the moved content lands in the page body.
 
 # Roadmap
 
