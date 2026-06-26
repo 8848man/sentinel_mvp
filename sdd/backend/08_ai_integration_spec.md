@@ -175,6 +175,12 @@ def parse_json_response(text: str) -> dict:
 
 ---
 
+## OCR-Assisted Log Extraction (Operations 3–4)
+
+See [`08_1_ocr_ai_integration.md`](./08_1_ocr_ai_integration.md) — split into its own doc (this file is already near its size limit). Adds OCR Extraction (image → verbatim text) and AI Log Cleanup (verbatim text → cleaned text) for the Incident Registration OCR flow. Spec only, not implemented.
+
+---
+
 ## Post-MVP Improvements
 
 - Switch to semantic vector similarity for similar incident matching (pgvector)

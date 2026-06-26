@@ -27,6 +27,12 @@ No auth required.
 
 ---
 
+## OCR
+
+See [`05_1_ocr_api_spec.md`](./05_1_ocr_api_spec.md) for the OCR-assisted Raw Log extraction endpoint (`POST /ocr/extract-log`) — split into its own doc per `spec_authoring_rules.md` (this file is already near its size limit). Spec only, not implemented.
+
+---
+
 ## Incidents
 
 ### `POST /incidents/analyze-metadata`

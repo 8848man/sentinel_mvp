@@ -1,12 +1,14 @@
 """
 Incident endpoints. Spec: sdd/05_api_spec.md §Incidents
 """
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.auth import get_current_user
 from app.core.database import get_db
 from app.schemas.incident import (
     AnalyzeMetadataRequest, AnalyzeMetadataResponse,
+    AnalysisJobTriggerResponse,
     IncidentCreateRequest, IncidentResponse,
     IncidentListResponse, IncidentPatchRequest,
 )
@@ -31,14 +33,52 @@ async def analyze_metadata(
 @router.post("/incidents", response_model=IncidentResponse, status_code=201)
 async def create_incident(
     body: IncidentCreateRequest,
+    background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Spec: POST /incidents — creates incident + runs full AI analysis."""
+    """
+    Creates incident immediately (no Gemini call in request path).
+    Analysis fires as a background task after the response is returned.
+    """
+    incident_id, job_id = await incident_service.create_incident(
+        body, current_user["user_id"], db
+    )
+    background_tasks.add_task(incident_service.execute_analysis, job_id)
+    return await incident_service.get_incident_detail(
+        incident_id, current_user["user_id"], db
+    )
+
+
+@router.post(
+    "/incidents/{incident_id}/analyze",
+    response_model=AnalysisJobTriggerResponse,
+    status_code=202,
+)
+async def trigger_reanalysis(
+    incident_id: str,
+    background_tasks: BackgroundTasks,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Triggers a new analysis run for an existing incident.
+    Returns 409 if an active (non-orphaned) analysis job already exists.
+    """
     try:
-        return await incident_service.create_and_analyze(body, current_user["user_id"], db)
-    except RuntimeError as e:
-        raise HTTPException(status_code=503, detail=str(e))
+        job_id, attempt_number = await incident_service.trigger_reanalysis(
+            incident_id, current_user["user_id"], db
+        )
+    except IntegrityError:
+        # DB partial unique index fired — race condition between two concurrent requests
+        raise HTTPException(status_code=409, detail="Analysis already active")
+    background_tasks.add_task(incident_service.execute_analysis, job_id)
+    return AnalysisJobTriggerResponse(
+        incident_id=incident_id,
+        job_id=job_id,
+        attempt_number=attempt_number,
+        analysis_status="pending",
+    )
 
 
 @router.get("/incidents", response_model=IncidentListResponse)
@@ -56,7 +96,7 @@ async def get_incident(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Spec: GET /incidents/{id} — full incident detail."""
+    """Spec: GET /incidents/{id} — full incident detail including analysis_status."""
     return await incident_service.get_incident_detail(incident_id, current_user["user_id"], db)
 
 

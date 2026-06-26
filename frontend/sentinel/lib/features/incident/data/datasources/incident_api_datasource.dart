@@ -1,9 +1,12 @@
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 import '../../../../core/api/api_endpoints.dart';
 import '../models/checklist_item_model.dart';
 import '../models/incident_metadata_model.dart';
 import '../models/incident_model.dart';
 import '../models/note_model.dart';
+import '../models/ocr_extraction_result_model.dart';
 import 'incident_datasource.dart';
 
 class IncidentApiDatasource implements IncidentDatasource {
@@ -31,6 +34,36 @@ class IncidentApiDatasource implements IncidentDatasource {
         data: {'log_text': rawLog},
       );
       return IncidentMetadataModel.fromJson(
+          response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw Exception(_detail(e));
+    }
+  }
+
+  // ── POST /ocr/extract-log ────────────────────────────────────────────────────
+
+  @override
+  Future<OcrExtractionResultModel> extractLogFromImage(
+    Uint8List imageBytes,
+    String filename,
+  ) async {
+    try {
+      final formData = FormData.fromMap({
+        'image': MultipartFile.fromBytes(imageBytes, filename: filename),
+        'target_field': 'raw_log',
+      });
+      // Longer timeout than the JSON endpoints — validation + optimization +
+      // up to two sequential Gemini calls server-side (sdd/backend/
+      // 05_1_ocr_api_spec.md, API Integration Plan).
+      final response = await _dio.post(
+        ApiEndpoints.ocrExtractLog,
+        data: formData,
+        options: Options(
+          sendTimeout: const Duration(seconds: 30),
+          receiveTimeout: const Duration(seconds: 45),
+        ),
+      );
+      return OcrExtractionResultModel.fromJson(
           response.data as Map<String, dynamic>);
     } on DioException catch (e) {
       throw Exception(_detail(e));

@@ -67,6 +67,19 @@
              └──> [AI Analysis & Resolution]
 ```
 
+**OCR-assisted Raw Log extraction (optional sub-flow — spec only, not yet implemented):**
+```
+[Incident Registration]
+     │
+     └─ Click "Scan / Upload Image" beside the Raw Log field
+             ↓
+     [Review Screen] (modal overlay, not a route)
+             │
+             ├─ "Use Cleaned Log" / "Use OCR Original" → inserts text into Raw Log field, closes overlay
+             └─ "Cancel" → closes overlay, Raw Log unchanged
+```
+See [`04_1_ocr_log_extraction.md`](./04_1_ocr_log_extraction.md) for the full image → OCR → cleanup pipeline.
+
 ---
 
 ## AI Analysis & Resolution Flow

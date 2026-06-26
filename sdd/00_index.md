@@ -39,6 +39,19 @@ Sub-numbered like `10_1_folder_structure.md`; each owns one responsibility per [
 | 10.6 | [Responsive: Auth & Dialogs](./frontend/10_6_responsive_auth_dialogs.md) | Login/Signup card, Detail Dialog → bottom sheet |
 | 10.7 | [Responsive: Mobile IA](./frontend/10_7_responsive_mobile_ia.md) | Mobile navigation/IA |
 
+### Context Sub-Documents
+
+| # | Document | Purpose |
+|---|----------|---------|
+| 04.1 | [OCR Log Extraction](./context/04_1_ocr_log_extraction.md) | Image-to-log OCR-assisted Raw Log extraction (Incident Registration) — spec only, not implemented |
+
+### Backend Sub-Documents
+
+| # | Document | Purpose |
+|---|----------|---------|
+| 05.1 | [OCR API Spec](./backend/05_1_ocr_api_spec.md) | `POST /ocr/extract-log` endpoint contract |
+| 08.1 | [OCR AI Integration](./backend/08_1_ocr_ai_integration.md) | Gemini OCR Extraction + Log Cleanup operations |
+
 ---
 
 ## Design References

@@ -34,6 +34,7 @@
 - `sdd/context/02_product_spec.md`
 - `sdd/context/03_user_flow.md`
 - `sdd/context/04_screen_spec.md`
+- `sdd/context/04_1_ocr_log_extraction.md`
 
 **Must NOT modify:**
 - Any file in `backend/`, `frontend/`, `database/`, `deployment/`
@@ -150,6 +151,7 @@
 **May modify:**
 - `backend/app/services/gemini_service.py`
 - `sdd/backend/08_ai_integration_spec.md`
+- `sdd/backend/08_1_ocr_ai_integration.md`
 
 **Must NOT modify:**
 - `backend/app/routers/*.py`

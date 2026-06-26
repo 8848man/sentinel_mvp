@@ -9,6 +9,7 @@ class ApiEndpoints {
   static const analyzeMetadata = '/api/v1/incidents/analyze-metadata';
   static const incidents = '/api/v1/incidents';
   static const archive = '/api/v1/archive';
+  static const ocrExtractLog = '/api/v1/ocr/extract-log';
 
   static String incidentById(String id) => '/api/v1/incidents/$id';
   static String resolveIncident(String id) => '/api/v1/incidents/$id/resolve';

@@ -2,13 +2,19 @@
 Business logic for all incident operations.
 Routers call these functions; never call gemini_service directly from routers.
 """
+import asyncio
 from datetime import datetime, timezone
 from uuid import UUID
 from fastapi import HTTPException
-from sqlalchemy import select, extract
+from sqlalchemy import select, extract, delete, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
-from app.models.models import Incident, FixFlow, ChecklistItem, Note, TimelineEvent, SimilarIncident, IncidentSequence
+from app.core.config import settings
+from app.core.database import AsyncSessionFactory
+from app.models.models import (
+    Incident, FixFlow, ChecklistItem, Note, TimelineEvent,
+    SimilarIncident, IncidentSequence, AnalysisJob,
+)
 from app.schemas.incident import IncidentCreateRequest, IncidentPatchRequest
 from app.services import gemini_service
 
@@ -27,53 +33,262 @@ async def extract_metadata_for_display(log_text: str, db: AsyncSession) -> dict:
     }
 
 
-# ── Create + Analyze ───────────────────────────────────────────────────────────
+# ── Create Incident (fast path — no Gemini) ───────────────────────────────────
 
-async def create_and_analyze(body: IncidentCreateRequest, user_id: str, db: AsyncSession) -> Incident:
+async def create_incident(
+    body: IncidentCreateRequest, user_id: str, db: AsyncSession
+) -> tuple[str, str]:
+    """
+    Creates incident + first analysis_jobs row in a single atomic transaction.
+    Returns (incident_id, job_id). Caller fires execute_analysis as a background task.
+    """
     async with db.begin():
         year = datetime.now(timezone.utc).year
         incident_code = await _next_incident_code(year, db, commit=True)
-
-        similar_ctx, similar_pairs = await _build_similar_context(body.components, user_id, db)
-        ai = await gemini_service.analyze_incident(
-            body.log_text, body.title, body.severity, body.components, similar_ctx
-        )
 
         incident = Incident(
             user_id=user_id,
             incident_code=incident_code,
             title=body.title,
-            description=ai.get("impact_summary"),
             log_text=body.log_text,
             severity=body.severity,
             components=body.components,
-            root_cause=ai.get("root_cause"),
-            confidence=ai.get("confidence"),
+            analysis_status="pending",
         )
         db.add(incident)
         await db.flush()
 
         db.add(TimelineEvent(incident_id=incident.id, event="Alert triggered"))
-        db.add(TimelineEvent(incident_id=incident.id, event="AI analysis completed"))
 
-        for i, flow_data in enumerate(ai.get("fix_flows", [])):
-            flow = FixFlow(
-                incident_id=incident.id,
-                title=flow_data["title"],
-                confidence=flow_data["confidence"],
-                sort_order=i,
+        job = AnalysisJob(
+            incident_id=incident.id,
+            attempt_number=1,
+            status="pending",
+        )
+        db.add(job)
+        await db.flush()
+
+        incident_id = str(incident.id)
+        job_id = str(job.id)
+
+    return incident_id, job_id
+
+
+# ── Background Worker ──────────────────────────────────────────────────────────
+
+async def execute_analysis(job_id: str) -> None:
+    """
+    Background worker — opens its own DB session.
+    Idempotent: if job is not 'pending' on entry, aborts silently.
+    All transitions write analysis_jobs and incidents.analysis_status in the same transaction.
+    """
+    async with AsyncSessionFactory() as db:
+
+        # ── T1: Claim job (SELECT FOR UPDATE + set processing) ─────────────────
+        job = None
+        incident = None
+        incident_id: str = ""
+        user_id: str = ""
+        log_text: str = ""
+        title: str = ""
+        severity: str = ""
+        components: list[str] = []
+
+        async with db.begin():
+            result = await db.execute(
+                select(AnalysisJob)
+                .where(AnalysisJob.id == job_id)
+                .with_for_update()
             )
-            db.add(flow)
-            await db.flush()
-            for j, step in enumerate(flow_data.get("checklist_items", []), start=1):
-                db.add(ChecklistItem(fix_flow_id=flow.id, step_number=j, description=step))
+            job = result.scalar_one_or_none()
+            if not job or job.status != "pending":
+                return  # duplicate execution guard
 
-        for sim_id, sim_code in similar_pairs[:3]:
-            score = next((s["match_score"] for s in ai.get("similar_incidents", [])
-                          if s.get("incident_code") == sim_code), 0.80)
-            db.add(SimilarIncident(incident_id=incident.id, similar_to_id=sim_id, match_score=score))
+            result2 = await db.execute(
+                select(Incident).where(Incident.id == job.incident_id)
+            )
+            incident = result2.scalar_one_or_none()
+            if not incident:
+                job.status = "failed"
+                job.error_message = "Incident not found"
+                return
 
-    return await get_incident_detail(str(incident.id), user_id, db)
+            # Capture all data needed outside this transaction
+            incident_id = str(incident.id)
+            user_id = str(incident.user_id)
+            log_text = incident.log_text
+            title = incident.title
+            severity = incident.severity
+            components = list(incident.components)
+
+            job.status = "processing"
+            job.started_at = datetime.now(timezone.utc)
+            incident.analysis_status = "processing"
+        # T1 commits — job=processing, incident.analysis_status=processing in DB
+
+        # ── Between T1 and T2: build context, truncate, call Gemini ───────────
+        similar_ctx = "None available."
+        similar_pairs: list[tuple[str, str]] = []
+        ai: dict | None = None
+        error_msg: str | None = None
+        truncated_log = log_text
+        char_count = len(log_text)
+
+        try:
+            async with db.begin():
+                similar_ctx, similar_pairs = await _build_similar_context(
+                    components, user_id, db
+                )
+
+            truncated_log, char_count = _truncate_log(log_text)
+
+            ai = await gemini_service.analyze_incident(
+                truncated_log,
+                title,
+                severity,
+                components,
+                similar_ctx,
+                timeout=settings.ANALYSIS_TIMEOUT_SECONDS,
+            )
+        except Exception as exc:
+            error_msg = str(exc) or type(exc).__name__
+
+        # ── T2: Persist results ────────────────────────────────────────────────
+        if error_msg is not None:
+            async with db.begin():
+                job.status = "failed"
+                job.error_message = error_msg
+                incident.analysis_status = "failed"
+                incident.analysis_error = error_msg
+                db.add(TimelineEvent(incident_id=incident_id, event="AI analysis failed"))
+        else:
+            async with db.begin():
+                # Replace old AI results (re-analysis case)
+                await db.execute(
+                    delete(FixFlow).where(FixFlow.incident_id == incident_id)
+                )
+                await db.execute(
+                    delete(SimilarIncident).where(
+                        SimilarIncident.incident_id == incident_id
+                    )
+                )
+
+                for i, flow_data in enumerate(ai.get("fix_flows", [])):
+                    flow = FixFlow(
+                        incident_id=incident_id,
+                        title=flow_data["title"],
+                        confidence=flow_data["confidence"],
+                        sort_order=i,
+                    )
+                    db.add(flow)
+                    await db.flush()
+                    for j, step in enumerate(
+                        flow_data.get("checklist_items", []), start=1
+                    ):
+                        db.add(
+                            ChecklistItem(
+                                fix_flow_id=flow.id,
+                                step_number=j,
+                                description=step,
+                            )
+                        )
+
+                for sim_id, sim_code in similar_pairs[:3]:
+                    score = next(
+                        (
+                            s["match_score"]
+                            for s in ai.get("similar_incidents", [])
+                            if s.get("incident_code") == sim_code
+                        ),
+                        0.80,
+                    )
+                    db.add(
+                        SimilarIncident(
+                            incident_id=incident_id,
+                            similar_to_id=sim_id,
+                            match_score=score,
+                        )
+                    )
+
+                db.add(
+                    TimelineEvent(
+                        incident_id=incident_id, event="AI analysis completed"
+                    )
+                )
+
+                incident.root_cause = ai.get("root_cause")
+                incident.confidence = ai.get("confidence")
+                incident.description = ai.get("impact_summary")
+                incident.analysis_status = "completed"
+                incident.analysis_error = None
+
+                job.status = "completed"
+                job.completed_at = datetime.now(timezone.utc)
+                job.input_char_count = char_count
+
+
+# ── Manual Re-analysis ─────────────────────────────────────────────────────────
+
+async def trigger_reanalysis(
+    incident_id: str, user_id: str, db: AsyncSession
+) -> tuple[str, int]:
+    """
+    Creates a new analysis_jobs row and resets incident cache.
+    Returns (job_id, attempt_number). Caller fires execute_analysis as a background task.
+    Raises 409 if an active (non-orphaned) job exists.
+    IntegrityError from the DB unique constraint (race condition) propagates to caller.
+    """
+    async with db.begin():
+        incident = await _get_owned(incident_id, user_id, db)
+
+        result = await db.execute(
+            select(AnalysisJob).where(
+                AnalysisJob.incident_id == incident_id,
+                AnalysisJob.status.in_(["pending", "processing"]),
+            )
+        )
+        active_job = result.scalar_one_or_none()
+
+        if active_job:
+            if active_job.status == "processing" and active_job.started_at:
+                elapsed = (
+                    datetime.now(timezone.utc) - active_job.started_at
+                ).total_seconds()
+                orphan_threshold = settings.ANALYSIS_TIMEOUT_SECONDS * 2
+                if elapsed > orphan_threshold:
+                    # Orphaned — mark failed so the partial index releases the slot
+                    active_job.status = "failed"
+                    active_job.error_message = (
+                        f"Orphaned: no completion after {int(elapsed)}s"
+                    )
+                    incident.analysis_status = "failed"
+                    incident.analysis_error = active_job.error_message
+                else:
+                    raise HTTPException(409, "Analysis already active")
+            else:
+                raise HTTPException(409, "Analysis already queued")
+
+        result2 = await db.execute(
+            select(func.max(AnalysisJob.attempt_number)).where(
+                AnalysisJob.incident_id == incident_id
+            )
+        )
+        max_attempt = result2.scalar() or 0
+
+        new_job = AnalysisJob(
+            incident_id=incident_id,
+            attempt_number=max_attempt + 1,
+            status="pending",
+        )
+        db.add(new_job)
+        incident.analysis_status = "pending"
+        incident.analysis_error = None
+        await db.flush()
+
+        job_id = str(new_job.id)
+        attempt_number = int(new_job.attempt_number)
+
+    return job_id, attempt_number
 
 
 # ── Dashboard list ─────────────────────────────────────────────────────────────
@@ -247,6 +462,20 @@ async def _next_incident_code(year: int, db: AsyncSession, commit: bool) -> str:
         seq = 1
         db.add(IncidentSequence(year=year, next_seq=2))
     return f"INC-{year}-{str(seq).zfill(3)}"
+
+
+def _truncate_log(log_text: str) -> tuple[str, int]:
+    max_chars = settings.MAX_ANALYSIS_INPUT_CHARS
+    if len(log_text) <= max_chars:
+        return log_text, len(log_text)
+    half = max_chars // 2
+    omitted = len(log_text) - max_chars
+    truncated = (
+        log_text[:half]
+        + f"\n\n[...{omitted} characters omitted for analysis...]\n\n"
+        + log_text[-half:]
+    )
+    return truncated, len(truncated)
 
 
 async def _build_similar_context(components: list[str], user_id: str, db: AsyncSession):

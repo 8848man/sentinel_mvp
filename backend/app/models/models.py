@@ -1,7 +1,7 @@
 """SQLAlchemy ORM models. Must match sdd/06_database_schema.md exactly."""
 from datetime import datetime, timezone
 from uuid import uuid4, uuid5, NAMESPACE_URL
-from sqlalchemy import DateTime, String, Text, Numeric, Boolean, SmallInteger, JSON, ForeignKey, UniqueConstraint, TypeDecorator
+from sqlalchemy import DateTime, String, Text, Numeric, Boolean, SmallInteger, Integer, JSON, ForeignKey, UniqueConstraint, TypeDecorator, Index, text
 from sqlalchemy.dialects.postgresql import ARRAY as PG_ARRAY
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
@@ -68,6 +68,8 @@ class Incident(Base):
     # the circular dependency between incidents↔fix_flows that requires ALTER TABLE,
     # which SQLite does not support.
     selected_fix_flow_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    analysis_status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
+    analysis_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
@@ -76,6 +78,7 @@ class Incident(Base):
     timeline: Mapped[list["TimelineEvent"]] = relationship(back_populates="incident", cascade="all, delete-orphan", order_by="TimelineEvent.occurred_at")
     similar_incidents: Mapped[list["SimilarIncident"]] = relationship(foreign_keys="SimilarIncident.incident_id", back_populates="incident", cascade="all, delete-orphan")
     note: Mapped["Note | None"] = relationship(back_populates="incident", cascade="all, delete-orphan", uselist=False)
+    analysis_jobs: Mapped[list["AnalysisJob"]] = relationship("AnalysisJob", back_populates="incident", cascade="all, delete-orphan")
 
 
 class FixFlow(Base):
@@ -135,3 +138,34 @@ class SimilarIncident(Base):
 
     incident: Mapped["Incident"] = relationship("Incident", foreign_keys=[incident_id], back_populates="similar_incidents")
     similar_to: Mapped["Incident"] = relationship("Incident", foreign_keys=[similar_to_id])
+
+
+class AnalysisJob(Base):
+    """Source of truth for every analysis run. incidents.analysis_status is a derived cache."""
+    __tablename__ = "analysis_jobs"
+    __table_args__ = (
+        # At most one active (pending or processing) job per incident at any time.
+        # DB-level enforcement; application SELECT check is a fast-path optimization only.
+        Index(
+            "uix_analysis_jobs_incident_active",
+            "incident_id",
+            unique=True,
+            sqlite_where=text("status IN ('pending', 'processing')"),
+            postgresql_where=text("status IN ('pending', 'processing')"),
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    incident_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("incidents.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    attempt_number: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_inferred: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    input_char_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+    incident: Mapped["Incident"] = relationship("Incident", back_populates="analysis_jobs")

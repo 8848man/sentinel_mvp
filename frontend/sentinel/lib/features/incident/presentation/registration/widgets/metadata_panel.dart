@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../../design_system/design_system.dart';
+import '../providers/ocr_flow_provider.dart';
 import '../providers/registration_form_provider.dart';
 import '../providers/registration_metadata_provider.dart';
 import 'architecture_component_list.dart';
+import 'ocr_picker_action.dart';
+import 'ocr_review_sheet.dart';
 
 class MetadataPanel extends ConsumerStatefulWidget {
   const MetadataPanel({super.key, required this.onSubmit});
@@ -58,6 +61,26 @@ class _MetadataPanelState extends ConsumerState<MetadataPanel> {
             TextSelection.collapsed(offset: next.title.length);
       }
     });
+
+    // Opens the Review Screen the moment OCR + cleanup finish successfully
+    // (OCR4) — a one-shot side effect, not a rebuild-driven widget, so it
+    // doesn't reopen if the sheet is dismissed and the state hasn't changed.
+    ref.listen<OcrFlowState>(ocrFlowProvider, (prev, next) {
+      if (prev?.stage != OcrFlowStage.reviewing &&
+          next.stage == OcrFlowStage.reviewing &&
+          next.result != null) {
+        showOcrReviewSheet(
+          context,
+          next.result!,
+          onInsert: (text) {
+            _logController.text = text;
+            ref.read(registrationFormProvider.notifier).updateRawLog(text);
+          },
+        );
+      }
+    });
+
+    final ocrFlow = ref.watch(ocrFlowProvider);
 
     return Container(
       decoration: BoxDecoration(
@@ -137,25 +160,105 @@ class _MetadataPanelState extends ConsumerState<MetadataPanel> {
                   const ArchitectureComponentList(),
                   const SizedBox(height: AppSpacing.md),
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      Text('Raw Log / Description', style: AppText.labelMedium),
-                      const Spacer(),
-                      GestureDetector(
-                        onTap: _pasteFromClipboard,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.content_paste,
-                                size: 14, color: AppColors.accentBlue),
-                            const SizedBox(width: 4),
-                            Text('Paste',
-                                style: AppText.labelSmall
-                                    .copyWith(color: AppColors.accentBlue)),
-                          ],
-                        ),
+                      Expanded(
+                        child: Text('Raw Log / Description',
+                            style: AppText.labelMedium,
+                            overflow: TextOverflow.ellipsis),
+                      ),
+                      // Wrap (not Row) so these actions reflow onto a second
+                      // line instead of overflowing horizontally on narrow
+                      // viewports (compatibility review, P3).
+                      Wrap(
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          GestureDetector(
+                            onTap: _pasteFromClipboard,
+                            child: Container(
+                              constraints: const BoxConstraints(minHeight: 44),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: AppSpacing.sm,
+                                  vertical: AppSpacing.xs),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.content_paste,
+                                      size: 14, color: AppColors.accentBlue),
+                                  const SizedBox(width: 4),
+                                  Text('Paste',
+                                      style: AppText.labelSmall
+                                          .copyWith(color: AppColors.accentBlue)),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const OcrPickerAction(),
+                        ],
                       ),
                     ],
                   ),
+                  if (ocrFlow.stage == OcrFlowStage.uploading) ...[
+                    const SizedBox(height: AppSpacing.xs),
+                    // Row + Expanded (not a fixed-width Text) so the
+                    // time-based message wraps within the available width
+                    // instead of overflowing on narrow/mobile viewports
+                    // (R4 mobile compatibility).
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Padding(
+                          padding: EdgeInsets.only(top: 2),
+                          child: SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: AppColors.accentBlue),
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.xs),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                ocrFlow.processingMessage.headline,
+                                style: AppText.bodySmall
+                                    .copyWith(color: AppColors.textMuted),
+                                softWrap: true,
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                ocrFlow.processingMessage.subtext,
+                                style: AppText.labelSmall
+                                    .copyWith(color: AppColors.textMuted),
+                                softWrap: true,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                  if (ocrFlow.stage == OcrFlowStage.error &&
+                      ocrFlow.errorMessage != null) ...[
+                    const SizedBox(height: AppSpacing.xs),
+                    GestureDetector(
+                      onTap: () => ref.read(ocrFlowProvider.notifier).cancel(),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.error_outline,
+                              size: 14, color: AppColors.severityCritical),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(ocrFlow.errorMessage!,
+                                style: AppText.bodySmall
+                                    .copyWith(color: AppColors.severityCritical)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: AppSpacing.xs),
                   SentinelTextArea(
                     placeholder:

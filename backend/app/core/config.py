@@ -22,6 +22,19 @@ class Settings(BaseSettings):
     GEMINI_MODEL: str = "gemini-2.0-flash"
     GEMINI_TIMEOUT_SECONDS: int = 15
 
+    # Dedicated timeout for OCR image-to-text extraction only — multimodal OCR
+    # on dense screenshots takes meaningfully longer than the text-only
+    # metadata/analysis calls that GEMINI_TIMEOUT_SECONDS covers.
+    OCR_TIMEOUT_SECONDS: int = 60
+
+    # Timeout for full incident analysis (background worker). Much larger than
+    # GEMINI_TIMEOUT_SECONDS because large logs take longer to process.
+    ANALYSIS_TIMEOUT_SECONDS: int = 120
+
+    # Maximum characters sent to Gemini for analysis. Logs exceeding this are
+    # truncated via head+tail strategy before the API call.
+    MAX_ANALYSIS_INPUT_CHARS: int = 30000
+
     ALLOWED_ORIGINS_STR: str = ""  # CSV로 받아오고
 
     @property

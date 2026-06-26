@@ -49,7 +49,7 @@ flutter run -d chrome `
 -- 실행
 flutter run -d chrome `
   --web-port=51302 `
-  --dart-define=AUTH_PROVIDER=supabase `
+  --dart-define=AUTH_PROVIDER=supabase ` 
   --dart-define=API_BASE_URL=https://sentinel-backend-106332252466.asia-northeast3.run.app `
   --dart-define=USE_MOCK_DATA=false `
   --dart-define=SUPABASE_URL=https://cemeuqlytgsiofnpxcui.supabase.co `

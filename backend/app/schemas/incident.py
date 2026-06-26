@@ -110,6 +110,8 @@ class IncidentResponse(BaseModel):
     root_cause: str | None
     confidence: float | None
     selected_fix_flow_id: UUID | None
+    analysis_status: str
+    analysis_error: str | None = None
     resolved_at: datetime | None
     created_at: datetime
     fix_flows: list[FixFlowResponse] = []
@@ -119,6 +121,13 @@ class IncidentResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class AnalysisJobTriggerResponse(BaseModel):
+    incident_id: str
+    job_id: str
+    attempt_number: int
+    analysis_status: str
 
 
 class IncidentListItem(BaseModel):
