@@ -4,6 +4,7 @@ import '../../domain/entities/auth_user.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../mocks/mock_auth_accounts.dart';
 
+// Mock tokens are opaque strings, not JWTs. USE_MOCK_DATA=false is not supported with this repository.
 class MockAuthRepository implements AuthRepository {
   final Map<String, String> _pendingSignUps = {};
   final Map<String, String> _directRegistrations = {};
@@ -13,6 +14,9 @@ class MockAuthRepository implements AuthRepository {
 
   @override
   Future<AuthUser?> getSignedInUser() async => _currentUser;
+
+  @override
+  Future<String?> getAccessToken() async => _currentUser?.accessToken;
 
   @override
   Stream<AuthUser?> get authStateChanges => _controller.stream;

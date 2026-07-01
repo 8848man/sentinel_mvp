@@ -1,4 +1,4 @@
-enum AuthProviderMode { mock, localBackend, supabase }
+enum AuthProviderMode { mock, supabase, dev }
 
 class AppConfig {
   AppConfig._();
@@ -20,19 +20,17 @@ class AppConfig {
   //
   // FastAPI does NOT issue tokens; it only verifies Supabase-issued JWTs.
   //
-  // Values: 'supabase' (default) | 'mock' | 'localBackend' (deprecated)
+  // Values: 'supabase' (default) | 'mock' | 'dev'
   //
-  // Requires at build time:
-  //   --dart-define=SUPABASE_URL=https://<project>.supabase.co
-  //   --dart-define=SUPABASE_ANON_KEY=<anon-key>
-  //
-  // Override: --dart-define=AUTH_PROVIDER=mock  (for UI-only development)
+  // supabase — production/staging: requires SUPABASE_URL and SUPABASE_ANON_KEY
+  // mock     — UI-only development: no backend, no network
+  // dev      — local full-stack: Flutter + local FastAPI + SQLite (requires ENABLE_DEV_AUTH=True on backend)
   static const String _authProviderEnv =
       String.fromEnvironment('AUTH_PROVIDER', defaultValue: 'supabase');
 
   static AuthProviderMode get authProvider => switch (_authProviderEnv) {
-        'localBackend' => AuthProviderMode.localBackend,
         'mock' => AuthProviderMode.mock,
+        'dev' => AuthProviderMode.dev,
         _ => AuthProviderMode.supabase,
       };
 }
