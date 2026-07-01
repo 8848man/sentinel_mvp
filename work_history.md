@@ -1,3 +1,13 @@
+## 2026-07-01
+
+### Release — Full release workflow for session 2026-06-30 commits
+- Description: Work history committed. Alembic migration b2c3d4e5f6a7 applied to PostgreSQL (a1b2c3d4e5f6 → b2c3d4e5f6a7 head). Backend restarted on port 8000 (/docs 200, /api/v1/dev/token endpoint live). Flutter frontend started on port 3000 with AUTH_PROVIDER=dev, USE_MOCK_DATA=false, API_BASE_URL=http://localhost:8000 (HTTP 200).
+- Migration applied: `b2c3d4e5f6a7_ai_platform_foundation.py`
+- Commit:
+  - 618990d (docs: add work history log for session 2026-06-30)
+
+---
+
 ## 2026-06-30
 
 ### 1. Feature — AI Platform schema migration and ORM model evolution
