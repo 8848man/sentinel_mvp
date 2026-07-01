@@ -69,6 +69,53 @@ Rules:
 """.strip()
 
 
+IMPROVED_FIX_FLOW_PROMPT = """
+You are an expert SRE AI assistant analyzing a production incident where all initial fix flows have been attempted but the incident remains unresolved.
+
+Incident: {title}
+Severity: {severity}
+Affected components: {components}
+
+Original root cause hypothesis:
+{root_cause}
+
+Error logs:
+---
+{log_text}
+---
+
+Fix flows that were ATTEMPTED but did NOT resolve the incident:
+{attempted_flows}
+
+Operator notes:
+{operator_notes}
+
+Known similar past incidents (for context only):
+{similar_context}
+
+The approaches listed above have already been tried and failed. Generate NEW fix flows that take a DIFFERENT approach.
+
+Respond ONLY with valid JSON (no markdown, no explanation):
+{{
+  "root_cause": "updated root cause explanation given that previous fixes failed (2-4 sentences)",
+  "confidence": 0.75,
+  "fix_flows": [
+    {{
+      "title": "action-oriented fix flow name (must differ from attempted approaches)",
+      "confidence": 0.85,
+      "checklist_items": ["Step 1 description", "Step 2 description"]
+    }}
+  ]
+}}
+
+Rules:
+- Provide 2-4 fix flows ordered by confidence descending
+- Each fix flow MUST represent a different approach from the attempted ones listed above
+- Each fix flow must have 2-5 checklist steps
+- confidence is float 0.0-1.0
+- Do NOT re-suggest any fix flow that appears in the attempted list
+""".strip()
+
 OCR_PROMPT = """
 You are transcribing text from an image for an incident-management tool.
 
@@ -179,6 +226,23 @@ async def cleanup_log_text(ocr_text: str) -> str:
         return (response.text or "").strip()
     except Exception:
         raise RuntimeError("Gemini returned no usable cleanup text")
+
+
+async def generate(prompt: str, timeout: int) -> str:
+    """Generic text generation used by AI action handlers.
+    Raises RuntimeError on timeout or empty response.
+    """
+    try:
+        response = await asyncio.wait_for(
+            _model.generate_content_async(prompt),
+            timeout=timeout,
+        )
+        text = (response.text or "").strip()
+        if not text:
+            raise RuntimeError("Gemini returned empty response")
+        return text
+    except asyncio.TimeoutError:
+        raise RuntimeError(f"Gemini API timeout after {timeout}s")
 
 
 def _parse_json(text: str) -> dict:
