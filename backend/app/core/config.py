@@ -7,17 +7,6 @@ class Settings(BaseSettings):
     DATABASE_URL: Optional[str] = None
     MIGRATION_DATABASE_URL: str | None = None
 
-    # ── Supabase JWT verification ──────────────────────────────────────────────
-    # The JWT secret from your Supabase project (Dashboard → Project Settings →
-    # API → JWT Secret). Used to verify Supabase-issued access tokens that the
-    # Flutter client attaches to every API request.
-    #
-    # Development: any string works as long as the Flutter client sends tokens
-    #              signed with the same secret (typically the Supabase anon key
-    #              or the real JWT secret even in dev).
-    # Production:  must match the Supabase project JWT secret exactly.
-    SUPABASE_JWT_SECRET: str = "dev-insecure-secret-change-in-production"
-
     GEMINI_API_KEY: str = ""
     GEMINI_MODEL: str = "gemini-2.0-flash"
     GEMINI_TIMEOUT_SECONDS: int = 15
@@ -52,6 +41,12 @@ class Settings(BaseSettings):
     # When False, the dev-only POST /api/v1/auth/register endpoint returns 403.
     SKIP_EMAIL_VERIFICATION: bool = True
 
+    # ── Development authentication (dev-only — must NOT be set in production) ──
+    # When True, enables POST /api/v1/dev/token and the HS256 validation path.
+    # Must never appear in Cloud Run config, Secret Manager, or any prod artifact.
+    ENABLE_DEV_AUTH: bool = False
+    DEV_JWT_SECRET: str = "dev-insecure-local-secret-change-me"
+
     @property
     def resolved_database_url(self) -> str:
         if self.DATABASE_URL:
@@ -62,6 +57,7 @@ class Settings(BaseSettings):
 
     class Config:
         env_file = ".env"
+        extra = "ignore"
 
 
 settings = Settings()
