@@ -1,62 +1,108 @@
 # Sentinel SDD — Master Index
 
 **Project:** Sentinel — AI Error Resolution Copilot  
-**Version:** 1.0.0-MVP  
-**Date:** 2026-04-29  
 **Stack:** Flutter · FastAPI · PostgreSQL · Supabase Auth · GCP · Gemini API
 
 ---
 
-## Document Map
+## Workflow (Start Here)
 
-| # | Document | Purpose | Lines |
-|---|----------|---------|-------|
-| 01 | [Requirements](./context/01_requirements.md) | Functional & non-functional requirements | ≤150 |
-| 02 | [Product Spec](./context/02_product_spec.md) | MVP scope, feature list, priorities | ≤150 |
-| 03 | [User Flow](./context/03_user_flow.md) | Navigation paths, state transitions | ≤150 |
-| 04 | [Screen Spec](./context/04_screen_spec.md) | All 9 screens mapped to PNG refs | ≤300 |
-| 05 | [API Spec](./backend/05_api_spec.md) | All REST endpoints with request/response | ≤300 |
-| 06 | [Database Schema](./backend/06_database_schema.md) | PostgreSQL tables, constraints, indexes | ≤300 |
-| 07 | [Auth Spec](./backend/07_auth_spec.md) | Supabase Auth flow, JWT validation | ≤150 |
-| 08 | [AI Integration Spec](./backend/08_ai_integration_spec.md) | Gemini API prompts, parsing, flows | ≤150 |
-| 09 | [Backend Architecture](./backend/09_backend_arch.md) | FastAPI structure, services, middleware | ≤150 |
-| 10 | [Frontend Architecture](./frontend/10_frontend_arch.md) | Flutter structure, Design System, routing | ≤300 |
-| 11 | [Deployment Spec](./infra/11_deployment_spec.md) | GCP services, CI/CD, environment config | ≤150 |
-| 12 | [Testing Spec](./infra/12_testing_spec.md) | Unit, widget, integration, API tests | ≤150 |
-| 13 | [Agent Instructions](./13_agent_instructions.md) | Agent roles, boundaries, collaboration | ≤300 |
+| Document | Purpose |
+|----------|---------|
+| [Implementation Lifecycle](./workflow/00_implementation_lifecycle.md) | 8-phase lifecycle — phases every task must follow |
+| [Context Loading Guide](./workflow/01_context_loading.md) | Which docs to load per task type (loading matrix) |
+| [Decision Flow](./workflow/02_decision_flow.md) | Step-by-step sequences for common decisions |
+| [Validation Spec](./workflow/03_validation.md) | Checklists per task type + smoke test sequence |
 
-### Frontend Sub-Documents (10.x)
+---
 
-Sub-numbered like `10_1_folder_structure.md`; each owns one responsibility per [`sdd/rules/spec_authoring_rules.md`](./rules/spec_authoring_rules.md).
+## Domain
+
+| Document | Purpose |
+|----------|---------|
+| [State Machines](./domain/state_machines.md) | Incident, AIAction, AnalysisStatus, FixFlow, Timeline lifecycles |
+
+---
+
+## Authentication
+
+Authentication is a system capability that spans backend, frontend, and infrastructure. `sdd/auth/` is the single source of truth. Any code or spec that interacts with identity, tokens, or session state must reference this area.
+
+| Document | Purpose |
+|----------|---------|
+| [Overview](./auth/00_overview.md) | Mechanisms, security principles, environment model, document map |
+| [Contract](./auth/01_contract.md) | Token format, required claims, AuthRepository interface, supported environment combinations |
+| [Production Auth](./auth/02_production.md) | Supabase sign-up/in flows, ES256/JWKS verification, session lifecycle, ownership enforcement |
+| [Development Auth](./auth/03_development.md) | Validator dispatch, dev token endpoint, production guards, frontend cleanup, mock credentials |
+
+---
+
+## Rules
+
+| Document | Purpose |
+|----------|---------|
+| [Spec Authoring Rules](./rules/spec_authoring_rules.md) | Size limits, writing style, split rules |
+| [Ownership Map](./rules/ownership.md) | Which files each area owns; cross-boundary rules |
+
+---
+
+## Context (Product / Design)
 
 | # | Document | Purpose |
 |---|----------|---------|
+| 01 | [Requirements](./context/01_requirements.md) | Functional & non-functional requirements |
+| 02 | [Product Spec](./context/02_product_spec.md) | MVP scope, feature list, priorities |
+| 03 | [User Flow](./context/03_user_flow.md) | Navigation paths, state transitions |
+| 04 | [Screen Spec Index](./context/04_screen_spec.md) | Navigation index for all screen documents |
+| 04.1 | [Auth Screens](./context/04_1_auth_screens.md) | Login · Sign Up |
+| 04.2 | [Dashboard Screen](./context/04_2_dashboard_screen.md) | Dashboard Status View · Severity View |
+| 04.3 | [Incident Flow Screens](./context/04_3_incident_flow_screens.md) | Registration · AI Analysis (AI Platform lifecycle) · Workspace |
+| 04.4 | [Archive Screens](./context/04_4_archive_screens.md) | Closed Incidents Archive · Detail Dialog |
+| 04.1† | [OCR Log Extraction](./context/04_1_ocr_log_extraction.md) | OCR-assisted raw log extraction sub-flow spec |
+
+---
+
+## Backend
+
+| # | Document | Purpose |
+|---|----------|---------|
+| 05 | [API Spec](./backend/05_api_spec.md) | All REST endpoints with request/response shapes |
+| 05.1 | [OCR API Spec](./backend/05_1_ocr_api_spec.md) | `POST /ocr/extract-log` endpoint contract |
+| 06 | [Database Schema](./backend/06_database_schema.md) | PostgreSQL tables, constraints, indexes |
+| 07 | [Auth Spec](./backend/07_auth_spec.md) | **Stub** — redirects to `sdd/auth/` (the canonical location) |
+| 08 | [AI Integration Spec](./backend/08_ai_integration_spec.md) | Handler registry, T1/T2 pattern, prompts |
+| 08.1 | [OCR AI Integration](./backend/08_1_ocr_ai_integration.md) | Gemini OCR extraction + log cleanup |
+| 09 | [Backend Architecture](./backend/09_backend_arch.md) | FastAPI structure, services, layering rules |
+
+---
+
+## Frontend
+
+| # | Document | Purpose |
+|---|----------|---------|
+| 10 | [Frontend Architecture](./frontend/10_frontend_arch.md) | Flutter structure, Design System, routing |
 | 10.1 | [Folder Structure](./frontend/10_1_folder_structure.md) | Flutter `lib/` directory layout |
-| 10.2 | [Responsive Strategy](./frontend/10_2_responsive_strategy.md) | Breakpoints, global responsive decisions, roadmap |
-| 10.3 | [Responsive: Dashboard](./frontend/10_3_responsive_dashboard.md) | Dashboard board/header responsive rules |
-| 10.4 | [Responsive: Incident Flow](./frontend/10_4_responsive_incident_flow.md) | Registration/Analysis/Workspace `TwoPanelLayout` collapse |
+| 10.2 | [Responsive Strategy](./frontend/10_2_responsive_strategy.md) | Breakpoints, global responsive decisions |
+| 10.3 | [Responsive: Dashboard](./frontend/10_3_responsive_dashboard.md) | Dashboard responsive rules |
+| 10.4 | [Responsive: Incident Flow](./frontend/10_4_responsive_incident_flow.md) | Registration/Analysis/Workspace collapse |
 | 10.5 | [Responsive: Archive](./frontend/10_5_responsive_archive.md) | Archive table → card list |
-| 10.6 | [Responsive: Auth & Dialogs](./frontend/10_6_responsive_auth_dialogs.md) | Login/Signup card, Detail Dialog → bottom sheet |
+| 10.6 | [Responsive: Auth & Dialogs](./frontend/10_6_responsive_auth_dialogs.md) | Login/Signup card, Detail Dialog |
 | 10.7 | [Responsive: Mobile IA](./frontend/10_7_responsive_mobile_ia.md) | Mobile navigation/IA |
 
-### Context Sub-Documents
+---
+
+## Infrastructure
 
 | # | Document | Purpose |
 |---|----------|---------|
-| 04.1 | [OCR Log Extraction](./context/04_1_ocr_log_extraction.md) | Image-to-log OCR-assisted Raw Log extraction (Incident Registration) — spec only, not implemented |
-
-### Backend Sub-Documents
-
-| # | Document | Purpose |
-|---|----------|---------|
-| 05.1 | [OCR API Spec](./backend/05_1_ocr_api_spec.md) | `POST /ocr/extract-log` endpoint contract |
-| 08.1 | [OCR AI Integration](./backend/08_1_ocr_ai_integration.md) | Gemini OCR Extraction + Log Cleanup operations |
+| 11 | [Deployment Spec](./infra/11_deployment_spec.md) | GCP services, CI/CD, environment config |
+| 12 | [Testing Spec](./infra/12_testing_spec.md) | Unit, widget, integration, API test plan |
 
 ---
 
 ## Design References
 
-All screen PNGs are in `/sentinel_screen_ref/`. Every screen spec maps directly to a PNG.
+All screen PNGs are in `/sentinel_screen_ref/`.
 
 | Screen | PNG File |
 |--------|----------|
@@ -72,22 +118,12 @@ All screen PNGs are in `/sentinel_screen_ref/`. Every screen spec maps directly 
 
 ---
 
-## Cross-Document Dependency
+## Archive
 
-```
-01_requirements
-    └──> 02_product_spec
-             └──> 03_user_flow
-                      └──> 04_screen_spec ──> 10_frontend_arch ──> 10_2..10_7 (responsive sub-docs)
-                      └──> 05_api_spec    ──> 09_backend_arch
-                      └──> 06_database_schema
-                      └──> 07_auth_spec
-                      └──> 08_ai_integration_spec
-                               └──> 09_backend_arch
-11_deployment_spec (reads all)
-12_testing_spec    (reads all)
-13_agent_instructions (reads all)
-```
+| Document | Notes |
+|----------|-------|
+| [13_agent_instructions.md](./13_agent_instructions.md) | Superseded by `workflow/` + `rules/ownership.md` |
+| [spec_compliance_report.md](./spec_compliance_report.md) | Compliance audit — resolved |
 
 ---
 
