@@ -1,5 +1,16 @@
 ## 2026-07-01
 
+### Production Release — feat/ocr merged to main and deployed
+- Description: feat/ocr merged to main (2cf5be1), reconciled with remote divergence (03fa4ab from develop PR), pushed to origin (826aa93) triggering GitHub Actions CI/CD for backend. Flutter web production build compiled with AUTH_PROVIDER=supabase, USE_MOCK_DATA=false, SKIP_EMAIL_VERIFICATION=false, API_BASE_URL=https://sentinel-backend-twyh3esabq-du.a.run.app and deployed to Firebase Hosting. Database already at b2c3d4e5f6a7 (head) — no new migration required.
+- Migration applied: `b2c3d4e5f6a7_ai_platform_foundation.py` (applied in prior run; confirmed head)
+- Backend (Cloud Run): `https://sentinel-backend-twyh3esabq-du.a.run.app` — HTTP 403 on guarded route (auth active, /docs disabled in production)
+- Frontend (Firebase): `https://sentinel-mvp-eeeee.web.app` — HTTP 200
+- Commits:
+  - 2cf5be1 (Merge branch 'feat/ocr')
+  - 826aa93 (Merge branch 'main' of https://github.com/8848man/sentinel_mvp)
+
+---
+
 ### Release — Full release workflow for session 2026-06-30 commits
 - Description: Work history committed. Alembic migration b2c3d4e5f6a7 applied to PostgreSQL (a1b2c3d4e5f6 → b2c3d4e5f6a7 head). Backend restarted on port 8000 (/docs 200, /api/v1/dev/token endpoint live). Flutter frontend started on port 3000 with AUTH_PROVIDER=dev, USE_MOCK_DATA=false, API_BASE_URL=http://localhost:8000 (HTTP 200).
 - Migration applied: `b2c3d4e5f6a7_ai_platform_foundation.py`
