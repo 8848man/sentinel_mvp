@@ -5,6 +5,8 @@ import '../../../di/incident_module.dart';
 import '../../../domain/entities/incident.dart';
 import '../../../domain/entities/checklist_item.dart';
 import '../../../domain/entities/fix_flow.dart';
+import '../../../domain/usecases/close_incident.dart';
+import '../../../domain/repositories/incident_repository.dart';
 
 @immutable
 class WorkspaceState {
@@ -14,6 +16,8 @@ class WorkspaceState {
     this.noteContent = '',
     this.togglingItemId,
     this.isResolving = false,
+    this.isClosing = false,
+    this.isReopening = false,
     this.error,
     this.navigateToDashboard = false,
   });
@@ -23,6 +27,8 @@ class WorkspaceState {
   final String noteContent;
   final String? togglingItemId;
   final bool isResolving;
+  final bool isClosing;
+  final bool isReopening;
   final String? error;
   final bool navigateToDashboard;
 
@@ -32,6 +38,8 @@ class WorkspaceState {
     String? noteContent,
     String? togglingItemId,
     bool? isResolving,
+    bool? isClosing,
+    bool? isReopening,
     String? error,
     bool? navigateToDashboard,
     bool clearTogglingItem = false,
@@ -44,6 +52,8 @@ class WorkspaceState {
       togglingItemId:
           clearTogglingItem ? null : (togglingItemId ?? this.togglingItemId),
       isResolving: isResolving ?? this.isResolving,
+      isClosing: isClosing ?? this.isClosing,
+      isReopening: isReopening ?? this.isReopening,
       error: clearError ? null : (error ?? this.error),
       navigateToDashboard: navigateToDashboard ?? this.navigateToDashboard,
     );
@@ -51,7 +61,7 @@ class WorkspaceState {
 }
 
 class WorkspaceNotifier extends FamilyNotifier<WorkspaceState, String> {
-  late final Debounce _noteDebounce;
+  late Debounce _noteDebounce;
 
   @override
   WorkspaceState build(String incidentId) {
@@ -84,9 +94,23 @@ class WorkspaceNotifier extends FamilyNotifier<WorkspaceState, String> {
       final updated =
           await useCase(itemId, isCompleted: !currentCompleted);
       _applyChecklistUpdate(updated);
+      _silentReload(arg); // refresh timeline without blocking UI
     } catch (_) {
       state = state.copyWith(
           clearTogglingItem: true, error: 'Failed to update step.');
+    }
+  }
+
+  Future<void> _silentReload(String id) async {
+    try {
+      final useCase = ref.read(getIncidentDetailUseCaseProvider);
+      final incident = await useCase(id);
+      // Don't overwrite state once a navigation has been triggered; a concurrent
+      // resolve/close already wrote the authoritative updated incident.
+      if (state.navigateToDashboard) return;
+      state = state.copyWith(incident: incident);
+    } catch (_) {
+      // Keep current state if background reload fails.
     }
   }
 
@@ -160,11 +184,50 @@ class WorkspaceNotifier extends FamilyNotifier<WorkspaceState, String> {
     state = state.copyWith(isResolving: true, clearError: true);
     try {
       final useCase = ref.read(resolveIncidentUseCaseProvider);
-      await useCase(arg);
-      state = state.copyWith(isResolving: false, navigateToDashboard: true);
+      final updated = await useCase(arg);
+      // Bump stamp first so the dashboard starts reloading before navigation.
+      ref.read(incidentListStampProvider.notifier).state++;
+      state = state.copyWith(
+        isResolving: false,
+        incident: updated,
+        navigateToDashboard: true,
+      );
     } catch (_) {
       state = state.copyWith(
           isResolving: false, error: 'Failed to resolve incident.');
+    }
+  }
+
+  Future<void> close() async {
+    state = state.copyWith(isClosing: true, clearError: true);
+    try {
+      final useCase = ref.read(closeIncidentUseCaseProvider);
+      final updated = await useCase(arg);
+      ref.read(incidentListStampProvider.notifier).state++;
+      state = state.copyWith(
+        isClosing: false,
+        incident: updated,
+        navigateToDashboard: true,
+      );
+    } catch (_) {
+      state = state.copyWith(
+          isClosing: false, error: 'Failed to close incident.');
+    }
+  }
+
+  Future<void> reopen() async {
+    // Clear any stale navigateToDashboard flag left over from a previous resolve
+    // so that _silentReload's guard does not suppress the state update.
+    state = state.copyWith(isReopening: true, navigateToDashboard: false, clearError: true);
+    try {
+      final repo = ref.read(incidentRepositoryProvider);
+      await repo.patchIncident(arg, status: 'in_progress');
+      await _silentReload(arg);
+      state = state.copyWith(isReopening: false);
+      ref.read(incidentListStampProvider.notifier).state++;
+    } catch (_) {
+      state = state.copyWith(
+          isReopening: false, error: 'Failed to reopen incident.');
     }
   }
 }

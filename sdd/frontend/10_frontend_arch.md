@@ -3,7 +3,7 @@
 **Framework:** Flutter (Web, Desktop-first layout)  
 **State Management:** Riverpod  
 **Routing:** go_router  
-**Refs:** → [Screen Spec](../context/04_screen_spec.md) · [User Flow](../context/03_user_flow.md) · [Folder Structure](./10_1_folder_structure.md)
+**Refs:** → [Screen Spec](../context/04_screen_spec.md) · [User Flow](../context/03_user_flow.md) · [Folder Structure](./10_1_folder_structure.md) · [Responsive Strategy](./10_2_responsive_strategy.md)
 
 ## Design System: Color Tokens (`tokens/colors.dart`)
 

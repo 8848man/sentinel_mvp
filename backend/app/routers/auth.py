@@ -1,6 +1,3 @@
-import time
-
-import jwt
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -24,18 +21,6 @@ class RegisterResponse(BaseModel):
     email: str
 
 
-class LoginRequest(BaseModel):
-    email: str
-    password: str
-
-
-class LoginResponse(BaseModel):
-    user_id: str
-    email: str
-    access_token: str
-    refresh_token: str
-
-
 def _require_dev() -> None:
     if not settings.SKIP_EMAIL_VERIFICATION:
         raise HTTPException(
@@ -54,15 +39,6 @@ def _validated_email(raw: str) -> str:
     return email
 
 
-def _issue_token(user_id: str, email: str) -> str:
-    now = int(time.time())
-    return jwt.encode(
-        {"sub": user_id, "email": email, "aud": "authenticated", "iat": now, "exp": now + 3600},
-        settings.SUPABASE_JWT_SECRET,
-        algorithm="HS256",
-    )
-
-
 @router.post(
     "/register",
     response_model=RegisterResponse,
@@ -70,6 +46,14 @@ def _issue_token(user_id: str, email: str) -> str:
     summary="Dev-only direct registration (email verification bypassed)",
 )
 async def dev_register(body: RegisterRequest, db: AsyncSession = Depends(get_db)) -> RegisterResponse:
+    """
+    Development-only endpoint to create a user record in the local DB so that
+    business-logic tables (incidents, etc.) can reference a known user_id.
+
+    Authentication itself is handled exclusively by Supabase Auth — this endpoint
+    does NOT issue any tokens. The client must sign in through Supabase and attach
+    the resulting access token to subsequent API requests.
+    """
     _require_dev()
     email = _validated_email(body.email)
     if len(body.password) < 8:
@@ -88,28 +72,10 @@ async def dev_register(body: RegisterRequest, db: AsyncSession = Depends(get_db)
     return RegisterResponse(message="Registration accepted.", email=email)
 
 
-@router.post(
-    "/login",
-    response_model=LoginResponse,
-    summary="Dev-only login that issues a signed JWT",
-)
-async def dev_login(body: LoginRequest, db: AsyncSession = Depends(get_db)) -> LoginResponse:
-    _require_dev()
-    email = _validated_email(body.email)
-    user = await db.scalar(select(User).where(User.email == email))
-    if user is None or user.password != body.password:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid login credentials",
-        )
-    return LoginResponse(
-        user_id=user.user_id,
-        email=email,
-        access_token=_issue_token(user.user_id, email),
-        refresh_token=f"local-refresh-{user.user_id}",
-    )
-
-
 @router.get("/me", summary="Return the current authenticated user")
 async def me(current_user: dict = Depends(get_current_user)) -> dict:
+    """
+    Validates the Supabase access token from the Authorization: Bearer header
+    and returns the decoded user identity.
+    """
     return current_user

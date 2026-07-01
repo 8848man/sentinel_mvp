@@ -1,5 +1,5 @@
 // Mock auth accounts for frontend testing without a live Supabase project.
-// See /sdd/frontend/mock_auth_accounts.md for the full spec.
+// These credentials are for MockAuthRepository only (USE_MOCK_DATA=true). Not valid for the real backend.
 
 class MockAuthAccount {
   const MockAuthAccount({

@@ -7,14 +7,21 @@ import '../data/datasources/incident_api_datasource.dart';
 import '../data/repositories/incident_repository_impl.dart';
 import '../domain/repositories/incident_repository.dart';
 import '../domain/usecases/analyze_incident_metadata.dart';
+import '../domain/usecases/extract_log_from_image.dart';
 import '../domain/usecases/create_incident.dart';
 import '../domain/usecases/get_incidents.dart';
 import '../domain/usecases/get_incident_detail.dart';
 import '../domain/usecases/resolve_incident.dart';
+import '../domain/usecases/close_incident.dart';
 import '../domain/usecases/update_checklist_item.dart';
 import '../domain/usecases/save_note.dart';
 import '../domain/usecases/get_archive_incidents.dart';
 import '../domain/usecases/select_fix_flow.dart';
+
+/// Monotonically-incrementing counter. Bump this after any mutation that
+/// changes the incident list (create, resolve) so that DashboardNotifier and
+/// ArchiveNotifier automatically reload via their ref.listen subscriptions.
+final incidentListStampProvider = StateProvider<int>((_) => 0);
 
 final incidentDatasourceProvider = Provider<IncidentDatasource>((ref) {
   if (AppConfig.useMockData) return IncidentRemoteDatasource();
@@ -27,6 +34,10 @@ final incidentRepositoryProvider = Provider<IncidentRepository>(
 
 final analyzeMetadataUseCaseProvider = Provider<AnalyzeIncidentMetadata>(
   (ref) => AnalyzeIncidentMetadata(ref.watch(incidentRepositoryProvider)),
+);
+
+final extractLogFromImageUseCaseProvider = Provider<ExtractLogFromImage>(
+  (ref) => ExtractLogFromImage(ref.watch(incidentRepositoryProvider)),
 );
 
 final createIncidentUseCaseProvider = Provider<CreateIncident>(
@@ -43,6 +54,10 @@ final getIncidentDetailUseCaseProvider = Provider<GetIncidentDetail>(
 
 final resolveIncidentUseCaseProvider = Provider<ResolveIncident>(
   (ref) => ResolveIncident(ref.watch(incidentRepositoryProvider)),
+);
+
+final closeIncidentUseCaseProvider = Provider<CloseIncident>(
+  (ref) => CloseIncident(ref.watch(incidentRepositoryProvider)),
 );
 
 final updateChecklistItemUseCaseProvider = Provider<UpdateChecklistItem>(

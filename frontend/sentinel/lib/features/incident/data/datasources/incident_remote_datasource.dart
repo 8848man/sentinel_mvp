@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import '../mocks/mock_incidents.dart';
 import '../models/incident_metadata_model.dart';
 import '../models/incident_model.dart';
@@ -5,14 +7,30 @@ import '../models/fix_flow_model.dart';
 import '../models/checklist_item_model.dart';
 import '../models/timeline_event_model.dart';
 import '../models/note_model.dart';
+import '../models/ocr_extraction_result_model.dart';
 import 'incident_datasource.dart';
 
 class IncidentRemoteDatasource implements IncidentDatasource {
   // In-memory mutable copy so UI mutations (checklist, notes, resolve) persist
   // within a single app session.
-  // In-memory mutable copy so UI mutations (checklist, notes, resolve) persist
-  // within a single app session.
   final List<IncidentModel> _store = List.of(kMockIncidents);
+
+  // ── POST /ocr/extract-log ────────────────────────────────────────────────────
+
+  Future<OcrExtractionResultModel> extractLogFromImage(
+    Uint8List imageBytes,
+    String filename,
+  ) async {
+    await Future.delayed(const Duration(milliseconds: 1200));
+    return OcrExtractionResultModel.fromJson({
+      'ocr_status': 'ok',
+      'ocr_text': '[mock] ERROR: connection refused at 10:42:03 — '
+          'mock OCR output for "$filename" (${imageBytes.length} bytes)',
+      'cleaned_text': '[mock] ERROR: connection refused at 10:42:03',
+      'cleanup_status': 'ok',
+      'warnings': <String>[],
+    });
+  }
 
   // ── POST /incidents/analyze-metadata ──────────────────────────────────────
 
@@ -227,6 +245,47 @@ class IncidentRemoteDatasource implements IncidentDatasource {
     return updated;
   }
 
+  // ── PATCH /incidents/{id}/close ───────────────────────────────────────────
+
+  Future<IncidentModel> closeIncident(String id) async {
+    await Future.delayed(const Duration(milliseconds: 300));
+    final idx = _store.indexWhere((i) => i.id == id);
+    if (idx == -1) throw Exception('Incident not found: $id');
+
+    final old = _store[idx];
+    final now = DateTime.now().toUtc();
+    final newTimeline = List<TimelineEventModel>.from(old.timeline)
+      ..add(TimelineEventModel(
+        id: 'mock-te-close-${now.millisecondsSinceEpoch}',
+        event: 'Incident closed',
+        occurredAt: now,
+      ));
+
+    final updated = IncidentModel(
+      id: old.id,
+      incidentCode: old.incidentCode,
+      title: old.title,
+      description: old.description,
+      logText: old.logText,
+      severity: old.severity,
+      status: 'closed',
+      components: old.components,
+      rootCause: old.rootCause,
+      confidence: old.confidence,
+      selectedFixFlowId: old.selectedFixFlowId,
+      resolvedAt: old.resolvedAt,
+      createdAt: old.createdAt,
+      updatedAt: now,
+      fixFlows: old.fixFlows,
+      similarIncidents: old.similarIncidents,
+      timeline: newTimeline,
+      note: old.note,
+    );
+
+    _store[idx] = updated;
+    return updated;
+  }
+
   // ── PATCH /checklist/{item_id} ─────────────────────────────────────────────
 
   Future<ChecklistItemModel> updateChecklistItem(
@@ -348,8 +407,6 @@ class IncidentRemoteDatasource implements IncidentDatasource {
 
   Future<List<IncidentModel>> getArchiveIncidents() async {
     await Future.delayed(const Duration(milliseconds: 400));
-    return _store
-        .where((i) => i.status == 'resolved' || i.status == 'closed')
-        .toList();
+    return _store.where((i) => i.status == 'closed').toList();
   }
 }

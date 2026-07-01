@@ -25,6 +25,10 @@ dependencies:
   intl: ^0.19.0
   google_fonts: ^6.2.1
 
+  # OCR-assisted Raw Log extraction (sdd/context/04_1_ocr_log_extraction.md)
+  # Web-compatible: wraps a browser file input, no native-app dependency.
+  image_picker: ^1.1.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -35,3 +39,4 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+

@@ -49,7 +49,7 @@ class RegistrationFormState {
   }
 }
 
-class RegistrationFormNotifier extends Notifier<RegistrationFormState> {
+class RegistrationFormNotifier extends AutoDisposeNotifier<RegistrationFormState> {
   @override
   RegistrationFormState build() => const RegistrationFormState();
 
@@ -93,6 +93,7 @@ class RegistrationFormNotifier extends Notifier<RegistrationFormState> {
         components: List.from(state.components),
       );
       state = state.copyWith(isSubmitting: false, createdIncidentId: incident.id);
+      ref.read(incidentListStampProvider.notifier).state++;
     } catch (e) {
       state = state.copyWith(
         isSubmitting: false,
@@ -103,6 +104,6 @@ class RegistrationFormNotifier extends Notifier<RegistrationFormState> {
 }
 
 final registrationFormProvider =
-    NotifierProvider<RegistrationFormNotifier, RegistrationFormState>(
+    NotifierProvider.autoDispose<RegistrationFormNotifier, RegistrationFormState>(
   RegistrationFormNotifier.new,
 );

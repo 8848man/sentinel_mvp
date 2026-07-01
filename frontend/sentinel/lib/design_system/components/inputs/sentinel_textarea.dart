@@ -14,6 +14,7 @@ class SentinelTextArea extends StatelessWidget {
     this.onChanged,
     this.monospace = false,
     this.expands = false,
+    this.focusNode,
   });
 
   final String? label;
@@ -25,11 +26,13 @@ class SentinelTextArea extends StatelessWidget {
   final bool monospace;
   // When true, fills parent vertically. Must be inside a bounded parent (e.g. Expanded).
   final bool expands;
+  final FocusNode? focusNode;
 
   @override
   Widget build(BuildContext context) {
     final field = TextField(
       controller: controller,
+      focusNode: focusNode,
       minLines: expands ? null : minLines,
       maxLines: expands ? null : maxLines,
       expands: expands,

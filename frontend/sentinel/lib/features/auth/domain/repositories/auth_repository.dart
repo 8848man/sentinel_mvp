@@ -2,7 +2,12 @@ import '../entities/auth_user.dart';
 
 abstract interface class AuthRepository {
   /// Returns the currently authenticated user, or null if no session exists.
+  /// Does not refresh the token.
   Future<AuthUser?> getSignedInUser();
+
+  /// Returns a valid (non-expired) access token, refreshing if necessary.
+  /// Returns null if no session exists or the session cannot be recovered.
+  Future<String?> getAccessToken();
 
   /// Authenticates with email and password.
   Future<AuthUser> signIn(String email, String password);

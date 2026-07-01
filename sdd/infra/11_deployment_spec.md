@@ -1,7 +1,7 @@
 # 11 — Deployment Specification
 
 **Cloud:** Google Cloud Platform (GCP)  
-**Refs:** → [Backend Architecture](../backend/09_backend_arch.md) · [Database Schema](../backend/06_database_schema.md)
+**Refs:** → [Backend Architecture](../backend/09_backend_arch.md) · [Database Schema](../backend/06_database_schema.md) · [Production Auth](../auth/02_production.md)
 
 ---
 
@@ -12,7 +12,7 @@
 | Backend API | Cloud Run | Containerized FastAPI, auto-scales to zero |
 | Frontend | Firebase Hosting | Flutter web build, CDN-served |
 | Database | Cloud SQL (PostgreSQL 16) | Managed PostgreSQL, private IP |
-| Secrets | Secret Manager | API keys, DB credentials, JWT secret |
+| Secrets | Secret Manager | API keys, DB credentials |
 | CI/CD | Cloud Build | Automated build + deploy on git push |
 | Logs | Cloud Logging | All backend logs |
 | Container Registry | Artifact Registry | Docker images |
@@ -50,15 +50,28 @@ spec:
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef: { name: sentinel-db-url, version: latest }
-            - name: SUPABASE_JWT_SECRET
+            - name: SUPABASE_URL
               valueFrom:
-                secretKeyRef: { name: sentinel-supabase-jwt, version: latest }
+                secretKeyRef: { name: sentinel-supabase-url, version: latest }
             - name: GEMINI_API_KEY
               valueFrom:
                 secretKeyRef: { name: sentinel-gemini-key, version: latest }
           resources:
             limits: { memory: 512Mi, cpu: "1" }
 ```
+
+---
+
+## Authentication (ES256 / JWKS)
+
+The backend verifies JWTs using Supabase's JWKS endpoint. No shared secret is used.
+
+- **Algorithm:** ES256 (not HS256)
+- **Key source:** `{SUPABASE_URL}/auth/v1/.well-known/jwks.json` — fetched at startup via `PyJWKClient`
+- **Required env var:** `SUPABASE_URL` — used to derive the JWKS URL at runtime
+- **No `SUPABASE_JWT_SECRET`** — this variable does not exist in the backend. Do not provision it.
+
+See [Production Auth](../auth/02_production.md) for the verification implementation.
 
 ---
 
@@ -87,11 +100,14 @@ CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080", "--worker
 - **DATABASE_URL format:** `postgresql+asyncpg://user:pass@/dbname?host=/cloudsql/PROJECT:REGION:INSTANCE`
 - **Backups:** Automated daily backups, 7-day retention
 
-**Initial setup:**
+**Initial schema setup (PostgreSQL):**
 ```bash
-gcloud sql connect sentinel-db --user=postgres
-# Run: /database/migrations/001_initial_schema.sql
+# Configure DATABASE_URL pointing to Cloud SQL instance, then:
+cd backend
+alembic upgrade head
 ```
+
+Migrations are located at `backend/alembic/versions/`. Never run `init_db()` against PostgreSQL — it is for SQLite dev only.
 
 ---
 
@@ -99,7 +115,10 @@ gcloud sql connect sentinel-db --user=postgres
 
 ```bash
 # Build Flutter web
-flutter build web --release
+flutter build web --release \
+  --dart-define=SUPABASE_URL=https://<project>.supabase.co \
+  --dart-define=SUPABASE_ANON_KEY=<anon-key> \
+  --dart-define=API_BASE_URL=https://sentinel-backend-<hash>-an.a.run.app
 
 # Deploy
 firebase deploy --only hosting
@@ -165,18 +184,30 @@ substitutions:
 
 ---
 
-## Environment Variables Summary
+## Environment Variables
 
-| Variable | Source | Used By |
-|----------|--------|---------|
-| `DATABASE_URL` | Secret Manager | Backend |
-| `SUPABASE_JWT_SECRET` | Secret Manager | Backend |
-| `GEMINI_API_KEY` | Secret Manager | Backend |
-| `SUPABASE_URL` | Flutter dart-defines | Frontend |
-| `SUPABASE_ANON_KEY` | Flutter dart-defines | Frontend |
-| `API_BASE_URL` | Flutter dart-defines | Frontend |
+### Backend (Secret Manager)
 
-Flutter env vars are injected at build time via `--dart-define`:
-```bash
-flutter build web --dart-define=SUPABASE_URL=xxx --dart-define=API_BASE_URL=yyy
-```
+| Variable | Secret Manager name | Purpose |
+|----------|--------------------|---------| 
+| `DATABASE_URL` | `sentinel-db-url` | PostgreSQL connection string (required in prod) |
+| `SUPABASE_URL` | `sentinel-supabase-url` | Supabase project URL; used to derive JWKS endpoint |
+| `GEMINI_API_KEY` | `sentinel-gemini-key` | Gemini API authentication |
+
+### Backend (optional env vars, set directly on Cloud Run service)
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `GEMINI_MODEL` | `gemini-2.0-flash` | Model override |
+| `ANALYSIS_TIMEOUT_SECONDS` | `15` | Gemini call timeout |
+| `ALLOWED_ORIGINS` | `["http://localhost:3000"]` | CORS allowed origins — set to production frontend URL |
+| `APP_ENV` | `development` | Environment label |
+| `SKIP_EMAIL_VERIFICATION` | `True` | Set `False` in production to disable dev-only register endpoint |
+
+### Flutter (--dart-define at build time)
+
+| Variable | Purpose |
+|----------|---------|
+| `SUPABASE_URL` | Supabase project URL for Flutter Supabase SDK |
+| `SUPABASE_ANON_KEY` | Supabase anon key for Flutter Supabase SDK |
+| `API_BASE_URL` | Backend Cloud Run URL |

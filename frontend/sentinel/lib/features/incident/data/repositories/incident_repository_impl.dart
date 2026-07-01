@@ -1,7 +1,10 @@
+import 'dart:typed_data';
+
 import '../../domain/entities/incident.dart';
 import '../../domain/entities/incident_metadata.dart';
 import '../../domain/entities/checklist_item.dart';
 import '../../domain/entities/note.dart';
+import '../../domain/entities/ocr_extraction_result.dart';
 import '../../domain/repositories/incident_repository.dart';
 import '../datasources/incident_datasource.dart';
 
@@ -12,6 +15,15 @@ class IncidentRepositoryImpl implements IncidentRepository {
   @override
   Future<IncidentMetadata> analyzeMetadata(String rawLog) async {
     final model = await _datasource.analyzeMetadata(rawLog);
+    return model.toEntity();
+  }
+
+  @override
+  Future<OcrExtractionResult> extractLogFromImage(
+    Uint8List imageBytes,
+    String filename,
+  ) async {
+    final model = await _datasource.extractLogFromImage(imageBytes, filename);
     return model.toEntity();
   }
 
@@ -59,6 +71,12 @@ class IncidentRepositoryImpl implements IncidentRepository {
   @override
   Future<Incident> resolveIncident(String id) async {
     final model = await _datasource.resolveIncident(id);
+    return model.toEntity();
+  }
+
+  @override
+  Future<Incident> closeIncident(String id) async {
+    final model = await _datasource.closeIncident(id);
     return model.toEntity();
   }
 

@@ -67,3 +67,6 @@ desktop.ini
 
 # ── Backup / scratch Flutter projects ───────────────────────────────────────────
 frontend/sentinel_backup/
+
+# ── Firebase CLI local cache/build snapshot ─────────────────────────────────────
+.firebase/

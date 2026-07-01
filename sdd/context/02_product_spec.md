@@ -30,6 +30,7 @@ AI-powered root cause analysis, and guided fix flows with progress tracking.
 | Closed Incidents Archive | P1 | Read-only table |
 | Incident Detail Dialog | P1 | Modal from archive / similar |
 | Similar Incident matching | P1 | Displayed in AI Analysis |
+| OCR-assisted Raw Log extraction (image → text) | P2 | Spec only — see [`04_1_ocr_log_extraction.md`](./04_1_ocr_log_extraction.md); not yet implemented |
 
 ### Out of Scope (MVP)
 
@@ -40,6 +41,7 @@ AI-powered root cause analysis, and guided fix flows with progress tracking.
 - Audit log export
 - Slack / PagerDuty integration
 - Role-based access control (RBAC)
+- OCR-assisted extraction for the Description field (Raw Log only for this pass — see OCR8 in `04_1_ocr_log_extraction.md`)
 
 ---
 

@@ -1,10 +1,18 @@
+import 'dart:typed_data';
+
 import '../models/checklist_item_model.dart';
 import '../models/incident_metadata_model.dart';
 import '../models/incident_model.dart';
 import '../models/note_model.dart';
+import '../models/ocr_extraction_result_model.dart';
 
 abstract class IncidentDatasource {
   Future<IncidentMetadataModel> analyzeMetadata(String rawLog);
+
+  Future<OcrExtractionResultModel> extractLogFromImage(
+    Uint8List imageBytes,
+    String filename,
+  );
 
   Future<IncidentModel> createIncident({
     required String logText,
@@ -24,6 +32,8 @@ abstract class IncidentDatasource {
   });
 
   Future<IncidentModel> resolveIncident(String id);
+
+  Future<IncidentModel> closeIncident(String id);
 
   Future<ChecklistItemModel> updateChecklistItem(
     String itemId, {

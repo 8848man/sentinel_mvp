@@ -31,9 +31,13 @@ class _PlaceholderScreen extends StatelessWidget {
 }
 
 /// Bridges Riverpod auth state to GoRouter's Listenable-based refresh.
+/// Only triggers a re-evaluation when the auth status changes, not on every
+/// isLoading / error update.
 class _RouterNotifier extends ChangeNotifier {
   _RouterNotifier(this._ref) {
-    _ref.listen<AuthState>(authProvider, (_, __) => notifyListeners());
+    _ref.listen<AuthState>(authProvider, (prev, next) {
+      if (prev?.status != next.status) notifyListeners();
+    });
   }
   final Ref _ref;
 }

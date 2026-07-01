@@ -1,4 +1,4 @@
-enum AuthProviderMode { mock, localBackend, supabase }
+enum AuthProviderMode { mock, supabase, dev }
 
 class AppConfig {
   AppConfig._();
@@ -15,14 +15,22 @@ class AppConfig {
       bool.fromEnvironment('SKIP_EMAIL_VERIFICATION', defaultValue: true);
 
   // ── Auth provider selection ──────────────────────────────────────────────────
-  // Values: 'mock' | 'localBackend' | 'supabase'
-  // Override at build time: --dart-define=AUTH_PROVIDER=supabase
+  // The canonical authentication flow is:
+  //   Flutter → Supabase Auth → obtain access token → attach to FastAPI calls
+  //
+  // FastAPI does NOT issue tokens; it only verifies Supabase-issued JWTs.
+  //
+  // Values: 'supabase' (default) | 'mock' | 'dev'
+  //
+  // supabase — production/staging: requires SUPABASE_URL and SUPABASE_ANON_KEY
+  // mock     — UI-only development: no backend, no network
+  // dev      — local full-stack: Flutter + local FastAPI + SQLite (requires ENABLE_DEV_AUTH=True on backend)
   static const String _authProviderEnv =
-      String.fromEnvironment('AUTH_PROVIDER', defaultValue: 'mock');
+      String.fromEnvironment('AUTH_PROVIDER', defaultValue: 'supabase');
 
   static AuthProviderMode get authProvider => switch (_authProviderEnv) {
-        'localBackend' => AuthProviderMode.localBackend,
-        'supabase' => AuthProviderMode.supabase,
-        _ => AuthProviderMode.mock,
+        'mock' => AuthProviderMode.mock,
+        'dev' => AuthProviderMode.dev,
+        _ => AuthProviderMode.supabase,
       };
 }

@@ -1,0 +1,1253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sentinel — Mobile Prototype</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  :root {
+    --bg-0: #0d1117;
+    --bg-1: #161b22;
+    --bg-2: #21262d;
+    --bg-3: #30363d;
+    --border: #21262d;
+    --border-2: #30363d;
+    --text-1: #e6edf3;
+    --text-2: #8b949e;
+    --text-3: #484f58;
+    --blue: #1f6feb;
+    --blue-dim: #0d1a2e;
+    --blue-text: #58a6ff;
+    --red: #da3633;
+    --red-dim: #3d1212;
+    --red-text: #f97583;
+    --amber: #e3b341;
+    --amber-dim: #2d1f00;
+    --amber-text: #e3b341;
+    --green: #3fb950;
+    --green-dim: #0d2818;
+    --green-text: #3fb950;
+    --purple-dim: #1e1a2e;
+    --purple-text: #a78bfa;
+  }
+
+  html, body {
+    background: #0a0e14;
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif;
+    min-height: 100vh;
+  }
+
+  /* ── Prototype wrapper ── */
+  .proto-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 32px;
+    justify-content: center;
+    padding: 32px 24px 64px;
+  }
+
+  .screen-block {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .screen-label {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: #484f58;
+    text-align: center;
+  }
+
+  /* ── Phone frame ── */
+  .phone {
+    width: 390px;
+    height: 844px;
+    background: var(--bg-0);
+    border-radius: 44px;
+    border: 1.5px solid #30363d;
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+  }
+
+  /* ── Status bar ── */
+  .sbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 24px 4px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-1);
+    flex-shrink: 0;
+  }
+
+  /* ── Nav bar ── */
+  .navbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 16px 10px;
+    border-bottom: 0.5px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .back-btn {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: var(--bg-1);
+    border: 0.5px solid var(--border-2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  .nav-title { font-size: 16px; font-weight: 600; color: var(--text-1); }
+  .nav-sub   { font-size: 11px; color: var(--text-2); margin-top: 1px; }
+
+  /* ── Scrollable content ── */
+  .content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 14px 16px 80px;
+    scrollbar-width: none;
+  }
+  .content::-webkit-scrollbar { display: none; }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--bg-1);
+    border: 0.5px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+  }
+  .card-sm {
+    background: var(--bg-1);
+    border: 0.5px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 14px;
+    margin-bottom: 8px;
+  }
+
+  /* ── Badges ── */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 9px;
+    border-radius: 20px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+  }
+  .b-critical { background: var(--red-dim);   color: var(--red-text);   border: 0.5px solid #5a1e1e; }
+  .b-major    { background: var(--amber-dim); color: var(--amber-text); border: 0.5px solid #4a3400; }
+  .b-minor    { background: var(--green-dim); color: var(--green-text); border: 0.5px solid #1a4028; }
+  .b-open     { background: var(--blue-dim);  color: var(--blue-text);  border: 0.5px solid #1a3050; }
+  .b-inprog   { background: var(--amber-dim); color: var(--amber-text); border: 0.5px solid #4a3400; }
+  .b-resolved { background: var(--green-dim); color: var(--green-text); border: 0.5px solid #1a4028; }
+  .b-closed   { background: var(--bg-2);      color: var(--text-2);     border: 0.5px solid var(--border-2); }
+
+  /* ── Buttons ── */
+  .btn-primary {
+    width: 100%;
+    background: var(--blue);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 14px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: center;
+    display: block;
+    letter-spacing: 0.1px;
+  }
+  .btn-secondary {
+    width: 100%;
+    background: var(--bg-2);
+    color: var(--text-1);
+    border: 0.5px solid var(--border-2);
+    border-radius: 10px;
+    padding: 13px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    text-align: center;
+    display: block;
+  }
+  .btn-danger {
+    width: 100%;
+    background: var(--red-dim);
+    color: var(--red-text);
+    border: 0.5px solid #5a1e1e;
+    border-radius: 10px;
+    padding: 13px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    text-align: center;
+    display: block;
+  }
+  .btn-ghost {
+    background: none;
+    border: 0.5px solid var(--border-2);
+    border-radius: 8px;
+    padding: 6px 14px;
+    font-size: 12px;
+    color: var(--blue-text);
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  /* ── Section label ── */
+  .slabel {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: var(--text-2);
+    margin: 18px 0 8px;
+  }
+
+  /* ── Form elements ── */
+  .field-label {
+    font-size: 12px;
+    color: var(--text-2);
+    margin-bottom: 6px;
+    display: block;
+  }
+  .field-input {
+    width: 100%;
+    background: var(--bg-0);
+    border: 0.5px solid var(--border-2);
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 14px;
+    color: var(--text-1);
+    font-family: inherit;
+    outline: none;
+    margin-bottom: 14px;
+  }
+  .field-input:focus { border-color: var(--blue); }
+  .field-input::placeholder { color: var(--text-3); }
+  .field-input.error { border-color: var(--red); }
+
+  textarea.field-input {
+    resize: none;
+    line-height: 1.6;
+  }
+
+  /* ── Toggle tabs ── */
+  .tab-row { display: flex; gap: 8px; margin-bottom: 16px; }
+  .tab {
+    padding: 7px 16px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 0.5px solid var(--border-2);
+    color: var(--text-2);
+    background: var(--bg-1);
+  }
+  .tab.active {
+    border-color: var(--blue);
+    color: var(--blue-text);
+    background: var(--blue-dim);
+  }
+
+  /* ── Timeline ── */
+  .tl-dot  { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 5px; }
+  .tl-line { width: 1px; background: var(--border); min-height: 18px; margin: 3px 0 3px 3.5px; }
+
+  /* ── Chip tags ── */
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: var(--bg-2);
+    border: 0.5px solid var(--border-2);
+    border-radius: 20px;
+    padding: 5px 10px;
+    font-size: 12px;
+    color: var(--text-1);
+    margin: 3px 4px 3px 0;
+  }
+  .chip-x { color: var(--text-2); cursor: pointer; font-size: 13px; }
+
+  /* ── Progress step ── */
+  .pstep { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; }
+  .pstep-circle {
+    width: 28px; height: 28px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 600; flex-shrink: 0;
+  }
+  .ps-done   { background: var(--green-dim); border: 1.5px solid var(--green); color: var(--green); }
+  .ps-active { background: var(--blue-dim);  border: 1.5px solid var(--blue);  color: var(--blue-text); }
+  .ps-idle   { background: var(--bg-1); border: 0.5px solid var(--border-2); color: var(--text-3); }
+
+  /* ── Spinner ── */
+  .spinner {
+    width: 16px; height: 16px;
+    border: 2px solid var(--border-2);
+    border-top-color: var(--blue-text);
+    border-radius: 50%;
+    animation: spin 0.75s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Pulse ── */
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+  .pulse { animation: pulse 1.4s infinite; }
+
+  /* ── Confidence bar ── */
+  .conf-bar { height: 4px; background: var(--bg-2); border-radius: 2px; overflow: hidden; }
+  .conf-fill { height: 100%; border-radius: 2px; }
+
+  /* ── Fix-flow row ── */
+  .fixrow {
+    background: var(--bg-1);
+    border: 0.5px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  .fixrow:hover { border-color: var(--blue); }
+  .fixrow.selected { border-color: var(--blue); background: var(--blue-dim); }
+
+  /* ── Checklist item ── */
+  .chk-item {
+    display: flex; align-items: center; gap: 12px;
+    background: var(--bg-2); border-radius: 10px;
+    padding: 12px 14px; margin-bottom: 8px; cursor: pointer;
+  }
+  .chk-box {
+    width: 20px; height: 20px; border-radius: 50%;
+    border: 1.5px solid var(--border-2);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; transition: all 0.15s;
+  }
+  .chk-box.done { background: var(--green-dim); border-color: var(--green); }
+
+  /* ── Bottom sheet overlay ── */
+  .overlay {
+    position: absolute; inset: 0;
+    background: rgba(0,0,0,.75);
+    z-index: 50;
+    display: none; align-items: flex-end;
+  }
+  .overlay.open { display: flex; }
+  .sheet {
+    background: var(--bg-1);
+    border-radius: 20px 20px 0 0;
+    border-top: 0.5px solid var(--border-2);
+    padding: 10px 16px 40px;
+    width: 100%;
+  }
+  .sheet-handle {
+    width: 36px; height: 4px; background: var(--border-2);
+    border-radius: 2px; margin: 0 auto 16px;
+  }
+  .sheet-title { font-size: 15px; font-weight: 600; color: var(--text-1); text-align: center; margin-bottom: 16px; }
+  .sheet-row {
+    display: flex; align-items: center; gap: 14px;
+    padding: 13px 0; border-bottom: 0.5px solid var(--border);
+    cursor: pointer;
+  }
+  .sheet-row:last-child { border-bottom: none; }
+  .sheet-icon {
+    width: 40px; height: 40px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center; font-size: 20px;
+  }
+
+  /* ── Modal dialog ── */
+  .modal-overlay {
+    position: absolute; inset: 0;
+    background: rgba(0,0,0,.8);
+    z-index: 60;
+    display: none; align-items: center; justify-content: center; padding: 20px;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--bg-1); border-radius: 16px;
+    border: 0.5px solid var(--border-2);
+    padding: 20px; width: 100%;
+  }
+
+  /* ── Inline error ── */
+  .field-error { font-size: 11px; color: var(--red-text); margin-top: -10px; margin-bottom: 12px; display: none; }
+  .field-error.show { display: block; }
+
+  /* ── Success animation ── */
+  .success-ring {
+    width: 64px; height: 64px; border-radius: 50%;
+    background: var(--green-dim); border: 2px solid var(--green);
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 16px;
+  }
+
+  /* ── OCR highlight ── */
+  .ocr-uncertain {
+    background: rgba(227,179,65,.18);
+    border-bottom: 1.5px solid var(--amber);
+    border-radius: 2px; padding: 0 2px;
+    cursor: pointer;
+  }
+  .ocr-uncertain.fixed {
+    background: rgba(63,185,80,.15);
+    border-bottom-color: var(--green);
+  }
+
+  /* ── Selector chips ── */
+  .sel-chip {
+    padding: 7px 14px; border-radius: 20px;
+    font-size: 12px; font-weight: 500; cursor: pointer;
+    border: 0.5px solid var(--border-2);
+    background: var(--bg-1); color: var(--text-2);
+    display: inline-block; margin: 3px 4px 3px 0;
+    transition: all 0.12s;
+  }
+  .sel-chip.on { border-color: var(--blue); background: var(--blue-dim); color: var(--blue-text); }
+  .sel-chip.crit-on { border-color: var(--red); background: var(--red-dim); color: var(--red-text); }
+  .sel-chip.major-on { border-color: var(--amber); background: var(--amber-dim); color: var(--amber-text); }
+  .sel-chip.minor-on { border-color: var(--green); background: var(--green-dim); color: var(--green-text); }
+
+  /* ── Divider ── */
+  .divider { height: 0.5px; background: var(--border); margin: 10px 0; }
+
+  /* ── Mono ── */
+  .mono { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11.5px; line-height: 1.8; color: #c9d1d9; }
+
+  /* ── Incident card accent ── */
+  .inc-card { border-radius: 12px; padding: 14px; margin-bottom: 10px; background: var(--bg-1); cursor: pointer; }
+  .inc-card.cr { border-left: 3px solid var(--red);   border-top: 0.5px solid var(--border); border-right: 0.5px solid var(--border); border-bottom: 0.5px solid var(--border); }
+  .inc-card.mj { border-left: 3px solid var(--amber); border-top: 0.5px solid var(--border); border-right: 0.5px solid var(--border); border-bottom: 0.5px solid var(--border); }
+  .inc-card.mn { border-left: 3px solid var(--green); border-top: 0.5px solid var(--border); border-right: 0.5px solid var(--border); border-bottom: 0.5px solid var(--border); opacity:.85; }
+
+  /* ── Empty state ── */
+  .empty { text-align: center; padding: 48px 24px; }
+
+  /* ── Similar incident pill ── */
+  .sim-card {
+    background: var(--bg-2); border-radius: 10px;
+    padding: 10px 14px; margin-bottom: 8px; cursor: pointer;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+
+  /* ── Scrollable fix flows need bottom padding ── */
+  .scroll-end { height: 24px; }
+</style>
+</head>
+<body>
+
+<div class="proto-wrap">
+
+<!-- ═══════════════════════════════════════════
+     1. LOGIN
+═══════════════════════════════════════════ -->
+<div class="screen-block">
+  <div class="screen-label">1 · Login</div>
+  <div class="phone" id="phone-login">
+    <div class="sbar"><span>9:41</span><span style="display:flex;gap:5px;align-items:center;"><i class="ti ti-wifi" style="font-size:14px"></i><i class="ti ti-battery-2" style="font-size:14px"></i></span></div>
+    <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:24px;">
+      <div style="width:100%;">
+        <!-- Logo -->
+        <div style="text-align:center;margin-bottom:36px;">
+          <div style="width:56px;height:56px;border-radius:16px;background:var(--blue);display:flex;align-items:center;justify-content:center;margin:0 auto 14px;">
+            <i class="ti ti-shield-bolt" style="font-size:26px;color:#fff"></i>
+          </div>
+          <div style="font-size:26px;font-weight:700;color:var(--text-1);letter-spacing:-0.5px;">Sentinel</div>
+          <div style="font-size:13px;color:var(--text-2);margin-top:4px;">AI Error Resolution Copilot</div>
+        </div>
+
+        <!-- Form card -->
+        <div style="background:var(--bg-1);border:0.5px solid var(--border-2);border-radius:16px;padding:24px;">
+          <label class="field-label">Email</label>
+          <input class="field-input" type="email" placeholder="you@company.com" id="login-email">
+
+          <label class="field-label">Password</label>
+          <input class="field-input" type="password" placeholder="••••••••" id="login-pass" style="margin-bottom:6px;">
+          <div class="field-error" id="login-err">Incorrect email or password. Please try again.</div>
+
+          <div style="margin-bottom:18px;text-align:right;"><span style="font-size:12px;color:var(--blue-text);cursor:pointer;">Forgot password?</span></div>
+
+          <button class="btn-primary" onclick="loginAttempt()">Continue</button>
+
+          <div style="text-align:center;margin-top:18px;font-size:13px;color:var(--text-2);">
+            No account? <span style="color:var(--blue-text);cursor:pointer;" onclick="navTo('phone-signup')">Sign up</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     1a. LOGIN ERROR STATE
+═══════════════════════════════════════════ -->
+<div class="screen-block">
+  <div class="screen-label">1a · Login — Error State</div>
+  <div class="phone">
+    <div class="sbar"><span>9:41</span><span style="display:flex;gap:5px;align-items:center;"><i class="ti ti-wifi" style="font-size:14px"></i><i class="ti ti-battery-2" style="font-size:14px"></i></span></div>
+    <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:24px;">
+      <div style="width:100%;">
+        <div style="text-align:center;margin-bottom:36px;">
+          <div style="width:56px;height:56px;border-radius:16px;background:var(--blue);display:flex;align-items:center;justify-content:center;margin:0 auto 14px;">
+            <i class="ti ti-shield-bolt" style="font-size:26px;color:#fff"></i>
+          </div>
+          <div style="font-size:26px;font-weight:700;color:var(--text-1);letter-spacing:-0.5px;">Sentinel</div>
+          <div style="font-size:13px;color:var(--text-2);margin-top:4px;">AI Error Resolution Copilot</div>
+        </div>
+        <div style="background:var(--bg-1);border:0.5px solid var(--border-2);border-radius:16px;padding:24px;">
+          <!-- Error banner -->
+          <div style="background:var(--red-dim);border:0.5px solid #5a1e1e;border-radius:8px;padding:10px 12px;margin-bottom:14px;display:flex;align-items:center;gap:8px;">
+            <i class="ti ti-alert-circle" style="font-size:16px;color:var(--red-text);flex-shrink:0"></i>
+            <span style="font-size:12px;color:var(--red-text);">Incorrect email or password. Please try again.</span>
+          </div>
+          <label class="field-label">Email</label>
+          <input class="field-input error" type="email" value="sre@company.com">
+          <label class="field-label">Password</label>
+          <input class="field-input error" type="password" placeholder="••••••••" style="margin-bottom:18px;">
+          <button class="btn-primary">Continue</button>
+          <div style="text-align:center;margin-top:18px;font-size:13px;color:var(--text-2);">No account? <span style="color:var(--blue-text);cursor:pointer;">Sign up</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     2. SIGN UP
+═══════════════════════════════════════════ -->
+<div class="screen-block">
+  <div class="screen-label">2 · Sign Up</div>
+  <div class="phone" id="phone-signup">
+    <div class="sbar"><span>9:41</span><span style="display:flex;gap:5px;align-items:center;"><i class="ti ti-wifi" style="font-size:14px"></i><i class="ti ti-battery-2" style="font-size:14px"></i></span></div>
+    <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:24px;">
+      <div style="width:100%;">
+        <div style="text-align:center;margin-bottom:32px;">
+          <div style="width:56px;height:56px;border-radius:16px;background:var(--blue);display:flex;align-items:center;justify-content:center;margin:0 auto 14px;">
+            <i class="ti ti-shield-bolt" style="font-size:26px;color:#fff"></i>
+          </div>
+          <div style="font-size:24px;font-weight:700;color:var(--text-1);letter-spacing:-0.5px;">Create account</div>
+          <div style="font-size:13px;color:var(--text-2);margin-top:4px;">Sentinel — AI Error Resolution Copilot</div>
+        </div>
+        <!-- Step indicator -->
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:24px;">
+          <div style="flex:1;height:3px;border-radius:2px;background:var(--blue);"></div>
+          <div style="flex:1;height:3px;border-radius:2px;background:var(--green);"></div>
+        </div>
+        <div style="font-size:11px;color:var(--text-2);margin-bottom:20px;text-align:center;">Step 2 of 2 — Set password &amp; verify email</div>
+
+        <div style="background:var(--bg-1);border:0.5px solid var(--border-2);border-radius:16px;padding:24px;">
+          <div style="background:var(--blue-dim);border:0.5px solid #1a3050;border-radius:8px;padding:10px 12px;margin-bottom:16px;display:flex;align-items:center;gap:8px;">
+            <i class="ti ti-mail" style="font-size:15px;color:var(--blue-text);flex-shrink:0"></i>
+            <span style="font-size:12px;color:var(--blue-text);">OTP sent to sre@acme.corp</span>
+          </div>
+          <label class="field-label">Set password</label>
+          <input class="field-input" type="password" placeholder="Min 8 characters">
+          <label class="field-label">Validation code</label>
+          <input class="field-input" type="text" placeholder="Enter code from email" style="letter-spacing:3px;font-size:16px;">
+          <label class="field-label">Confirm email</label>
+          <input class="field-input" type="email" value="sre@acme.corp" style="color:var(--text-2);">
+          <button class="btn-primary" onclick="navTo('phone-dashboard')">Continue</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     3. DASHBOARD — Status View
+═══════════════════════════════════════════ -->
+<div class="screen-block">
+  <div class="screen-label">3 · Dashboard — Status View</div>
+  <div class="phone" id="phone-dashboard">
+    <div class="sbar"><span>9:41</span><span style="display:flex;gap:5px;align-items:center;"><i class="ti ti-wifi" style="font-size:14px"></i><i class="ti ti-battery-2" style="font-size:14px"></i></span></div>
+    <!-- Header -->
+    <div style="padding:10px 16px 0;display:flex;justify-content:space-between;align-items:flex-start;border-bottom:0.5px solid var(--border);padding-bottom:10px;flex-shrink:0;">
+      <div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="width:28px;height:28px;border-radius:8px;background:var(--blue);display:flex;align-items:center;justify-content:center;"><i class="ti ti-shield-bolt" style="font-size:14px;color:#fff"></i></div>
+          <div style="font-size:20px;font-weight:700;color:var(--text-1);letter-spacing:-0.3px;">Sentinel</div>
+        </div>
+        <div style="font-size:11px;color:var(--text-2);margin-top:3px;">Incident Command Center · 14:41 UTC</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <div style="width:34px;height:34px;border-radius:8px;background:var(--bg-1);border:0.5px solid var(--border-2);display:flex;align-items:center;justify-content:center;cursor:pointer;" onclick="navTo('phone-archive')">
+          <i class="ti ti-archive" style="font-size:16px;color:var(--text-2)"></i>
+        </div>
+        <div style="height:34px;background:var(--blue);border-radius:8px;display:flex;align-items:center;padding:0 12px;gap:5px;cursor:pointer;" onclick="navTo('phone-register')">
+          <i class="ti ti-plus" style="font-size:15px;color:#fff"></i>
+          <span style="font-size:13px;font-weight:600;color:#fff;">Register</span>
+        </div>
+      </div>
+    </div>
+    <!-- Tabs -->
+    <div style="padding:10px 16px;border-bottom:0.5px solid var(--border);flex-shrink:0;">
+      <div class="tab-row" style="margin:0;">
+        <div class="tab active">Status View</div>
+        <div class="tab" onclick="navTo('phone-dash-sev')">Severity View</div>
+      </div>
+    </div>
+
+    <div class="content" style="padding-top:14px;">
+      <!-- Open -->
+      <div style="font-size:12px;font-weight:600;color:var(--red-text);margin-bottom:10px;display:flex;align-items:center;gap:6px;"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--red);"></span>Open (1)</div>
+      <div class="inc-card cr" onclick="navTo('phone-workspace')">
+        <div style="font-size:10px;color:var(--text-2);margin-bottom:4px;">INC-2026-041 · <span style="color:var(--red-text)">23m ago</span></div>
+        <div style="font-size:15px;font-weight:600;color:var(--text-1);margin-bottom:4px;">DB Connection Pool Exhausted</div>
+        <div style="font-size:12px;color:var(--text-2);margin-bottom:10px;">Primary database is rejecting new connections.</div>
+        <span class="badge b-critical">Critical</span>
+      </div>
+
+      <!-- In Progress -->
+      <div style="font-size:12px;font-weight:600;color:var(--amber-text);margin:16px 0 10px;display:flex;align-items:center;gap:6px;"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--amber);"></span>In Progress (1)</div>
+      <div class="inc-card mj">
+        <div style="font-size:10px;color:var(--text-2);margin-bottom:4px;">INC-2026-042 · 41m ago</div>
+        <div style="font-size:15px;font-weight:600;color:var(--text-1);margin-bottom:4px;">Auth Service Latency Spike</div>
+        <div style="font-size:12px;color:var(--text-2);margin-bottom:10px;">Token validation p99 exceeding 2s.</div>
+        <span class="badge b-major">Major</span>
+      </div>
+
+      <!-- Resolved -->
+      <div style="font-size:12px;font-weight:600;color:var(--green-text);margin:16px 0 10px;display:flex;align-items:center;gap:6px;"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--green);"></span>Resolved (1)</div>
+      <div class="inc-card mn">
+        <div style="font-size:10px;color:var(--text-2);margin-bottom:4px;">INC-2026-040 · 1h ago</div>
+        <div style="font-size:15px;font-weight:600;color:var(--text-1);margin-bottom:4px;">Scheduled Job Queue Backlog</div>
+        <div style="font-size:12px;color:var(--text-2);margin-bottom:10px;">Worker scaling resolved backlog.</div>
+        <span class="badge b-minor">Minor</span>
+      </div>
+      <div class="scroll-end"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     3a. DASHBOARD — Severity View
+═══════════════════════════════════════════ -->
+<div class="screen-block">
+  <div class="screen-label">3a · Dashboard — Severity View</div>
+  <div class="phone" id="phone-dash-sev">
+    <div class="sbar"><span>9:41</span><span style="display:flex;gap:5px;align-items:center;"><i class="ti ti-wifi" style="font-size:14px"></i><i class="ti ti-battery-2" style="font-size:14px"></i></span></div>
+    <div style="padding:10px 16px 0;display:flex;justify-content:space-between;align-items:flex-start;border-bottom:0.5px solid var(--border);padding-bottom:10px;flex-shrink:0;">
+      <div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="width:28px;height:28px;border-radius:8px;background:var(--blue);display:flex;align-items:center;justify-content:center;"><i class="ti ti-shield-bolt" style="font-size:14px;color:#fff"></i></div>
+          <div style="font-size:20px;font-weight:700;color:var(--text-1);letter-spacing:-0.3px;">Sentinel</div>
+        </div>
+        <div style="font-size:11px;color:var(--text-2);margin-top:3px;">Incident Prioritization by Severity</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <div style="width:34px;height:34px;border-radius:8px;background:var(--bg-1);border:0.5px solid var(--border-2);display:flex;align-items:center;justify-content:center;">
+          <i class="ti ti-archive" style="font-size:16px;color:var(--text-2)"></i>
+        </div>
+        <div style="height:34px;background:var(--blue);border-radius:8px;display:flex;align-items:center;padding:0 12px;gap:5px;">
+          <i class="ti ti-plus" style="font-size:15px;color:#fff"></i>
+          <span style="font-size:13px;font-weight:600;color:#fff;">Register</span>
+        </div>
+      </div>
+    </div>
+    <div style="padding:10px 16px;border-bottom:0.5px solid var(--border);flex-shrink:0;">
+      <div class="tab-row" style="margin:0;">
+        <div class="tab" onclick="navTo('phone-dashboard')">Status View</div>
+        <div class="tab active">Severity View</div>
+      </div>
+    </div>
+    <div class="content" style="padding-top:14px;">
+      <div style="font-size:12px;font-weight:600;color:var(--red-text);margin-bottom:10px;display:flex;align-items:center;gap:6px;"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--red);"></span>Critical (1)</div>
+      <div class="inc-card cr">
+        <div style="font-size:10px;color:var(--text-2);margin-bottom:4px;">INC-2026-041</div>
+        <div style="font-size:15px;font-weight:600;color:var(--text-1);margin-bottom:4px;">DB Connection Pool Exhausted</div>
+        <div style="font-size:12px;color:var(--text-2);margin-bottom:10px;">Primary database rejecting new connections.</div>
+        <span class="badge b-inprog">In Progress</span>
+      </div>
+      <div style="font-size:12px;font-weight:600;color:var(--amber-text);margin:16px 0 10px;display:flex;align-items:center;gap:6px;"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--amber);"></span>Major (1)</div>
+      <div class="inc-card mj">
+        <div style="font-size:10px;color:var(--text-2);margin-bottom:4px;">INC-2026-042</div>
+        <div style="font-size:15px;font-weight:600;color:var(--text-1);margin-bottom:4px;">Auth Service Latency Spike</div>
+        <div style="font-size:12px;color:var(--text-2);margin-bottom:10px;">Token validation p99 exceeding threshold.</div>
+        <span class="badge b-open">Open</span>
+      </div>
+      <div style="font-size:12px;font-weight:600;color:var(--green-text);margin:16px 0 10px;display:flex;align-items:center;gap:6px;"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--green);"></span>Minor (1)</div>
+      <div class="inc-card mn">
+        <div style="font-size:10px;color:var(--text-2);margin-bottom:4px;">INC-2026-044</div>
+        <div style="font-size:15px;font-weight:600;color:var(--text-1);margin-bottom:4px;">Metrics Collector Delay</div>
+        <div style="font-size:12px;color:var(--text-2);margin-bottom:10px;">Telemetry ingestion delayed by 3 minutes.</div>
+        <span class="badge b-open">Open</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     4. INCIDENT REGISTRATION
+═══════════════════════════════════════════ -->
+<div class="screen-block">
+  <div class="screen-label">4 · New Incident Registration</div>
+  <div class="phone" id="phone-register">
+    <div class="sbar"><span>9:41</span><span style="display:flex;gap:5px;align-items:center;"><i class="ti ti-wifi" style="font-size:14px"></i><i class="ti ti-battery-2" style="font-size:14px"></i></span></div>
+    <div class="navbar">
+      <div class="back-btn" onclick="navTo('phone-dashboard')"><i class="ti ti-arrow-left" style="font-size:17px;color:var(--text-2)"></i></div>
+      <div><div class="nav-title">Register Incident</div><div class="nav-sub">Paste logs or describe the issue</div></div>
+    </div>
+    <div class="content" style="padding-top:14px;">
+      <!-- Paste area -->
+      <div class="slabel" style="margin-top:0;">Error Logs / Description</div>
+      <textarea class="field-input" rows="6" placeholder="Paste stack traces, error logs, or describe the incident...&#10;&#10;e.g. FATAL: HikariPool-1 - Connection pool exhausted..."></textarea>
+
+      <!-- AI detected section -->
+      <div style="background:var(--blue-dim);border:0.5px solid #1a3050;border-radius:10px;padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;gap:8px;">
+        <i class="ti ti-sparkles" style="font-size:15px;color:var(--blue-text);flex-shrink:0"></i>
+        <span style="font-size:12px;color:var(--blue-text);">AI detected metadata below. Edit as needed.</span>
+      </div>
+
+      <div class="slabel" style="margin-top:0;">Suggested Incident ID</div>
+      <input class="field-input" type="text" value="INC-2026-043" style="color:var(--text-2);">
+
+      <div class="slabel" style="margin-top:0;">Suggested Title</div>
+      <input class="field-input" type="text" value="PostgreSQL Connection Pool Exhaustion">
+
+      <div class="slabel" style="margin-top:0;">Suggested Severity</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">
+        <div class="sel-chip crit-on">Critical</div>
+        <div class="sel-chip" onclick="selSev(this)">Major</div>
+        <div class="sel-chip" onclick="selSev(this)">Minor</div>
+        <div class="sel-chip" onclick="selSev(this)">Info</div>
+      </div>
+
+      <div class="slabel" style="margin-top:0;">Detected Architecture</div>
+      <div style="display:flex;flex-wrap:wrap;margin-bottom:6px;">
+        <span class="chip">AWS EKS <span class="chip-x">×</span></span>
+        <span class="chip">PostgreSQL <span class="chip-x">×</span></span>
+        <span class="chip">Redis <span class="chip-x">×</span></span>
+        <span class="chip">Spring Boot <span class="chip-x">×</span></span>
+      </div>
+      <button class="btn-ghost" style="margin-bottom:16px;width:100%;text-align:center;">+ Add Component</button>
+
+      <button class="btn-primary" onclick="navTo('phone-analysis')" style="margin-top:4px;">Analyze Incident</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     4a. REGISTRATION — AI Filling (Loading)
+═══════════════════════════════════════════ -->
+<div class="screen-block">
+  <div class="screen-label">4a · Registration — AI Loading</div>
+  <div class="phone">
+    <div class="sbar"><span>9:41</span><span style="display:flex;gap:5px;align-items:center;"><i class="ti ti-wifi" style="font-size:14px"></i><i class="ti ti-battery-2" style="font-size:14px"></i></span></div>
+    <div class="navbar">
+      <div class="back-btn"><i class="ti ti-arrow-left" style="font-size:17px;color:var(--text-2)"></i></div>
+      <div><div class="nav-title">Register Incident</div></div>
+    </div>
+    <div class="content" style="padding-top:14px;">
+      <div class="slabel" style="margin-top:0;">Error Logs / Description</div>
+      <div style="background:var(--bg-0);border:0.5px solid var(--border-2);border-radius:10px;padding:12px;margin-bottom:14px;font-size:12px;color:var(--text-2);line-height:1.7;">
+        FATAL [14:18:03Z] HikariPool-1 - Connection is not available, request timed out after 30000ms…
+      </div>
+      <!-- Loading shimmer skeleton -->
+      <div style="background:var(--blue-dim);border:0.5px solid #1a3050;border-radius:10px;padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;gap:8px;">
+        <div class="spinner"></div>
+        <span style="font-size:12px;color:var(--blue-text);">Analyzing with AI — extracting metadata…</span>
+      </div>
+      <div class="slabel" style="margin-top:0;">Suggested Title</div>
+      <div style="height:40px;background:var(--bg-2);border-radius:10px;margin-bottom:14px;overflow:hidden;">
+        <div style="height:100%;width:60%;background:linear-gradient(90deg,var(--bg-2),var(--bg-3),var(--bg-2));animation:shimmer 1.4s infinite;" id="shimmer"></div>
+      </div>
+      <div class="slabel" style="margin-top:0;">Suggested Severity</div>
+      <div style="height:40px;background:var(--bg-2);border-radius:10px;margin-bottom:14px;"></div>
+      <div class="slabel" style="margin-top:0;">Detected Architecture</div>
+      <div style="height:36px;background:var(--bg-2);border-radius:10px;margin-bottom:14px;width:70%;"></div>
+      <button class="btn-primary" style="opacity:.4;pointer-events:none;">Analyze Incident</button>
+    </div>
+  </div>
+</div>
+<style>
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+</style>
+
+<!-- ═══════════════════════════════════════════
+     5. AI ANALYSIS & RESOLUTION
+═══════════════════════════════════════════ -->
+<div class="screen-block">
+  <div class="screen-label">5 · AI Analysis &amp; Resolution</div>
+  <div class="phone" id="phone-analysis">
+    <div class="sbar"><span>9:41</span><span style="display:flex;gap:5px;align-items:center;"><i class="ti ti-wifi" style="font-size:14px"></i><i class="ti ti-battery-2" style="font-size:14px"></i></span></div>
+    <div class="navbar">
+      <div class="back-btn" onclick="navTo('phone-register')"><i class="ti ti-arrow-left" style="font-size:17px;color:var(--text-2)"></i></div>
+      <div style="flex:1;"><div class="nav-title">AI Analysis</div><div class="nav-sub">INC-2026-041 · DB Connection Pool</div></div>
+      <span class="badge b-critical">Critical</span>
+    </div>
+    <div class="content" style="padding-top:14px;">
+      <!-- Root cause -->
+      <div class="card">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+          <i class="ti ti-brain" style="font-size:16px;color:var(--blue-text)"></i>
+          <span style="font-size:13px;font-weight:600;color:var(--text-1);">Likely Root Cause</span>
+        </div>
+        <div style="font-size:13px;color:var(--text-2);line-height:1.6;margin-bottom:12px;">Database connection leak caused by unreleased sessions in the Spring Boot HikariCP connection lifecycle on timeout paths.</div>
+        <!-- Confidence -->
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <span style="font-size:11px;color:var(--text-2);">Confidence</span>
+          <span style="font-size:18px;font-weight:700;color:var(--green-text);">87%</span>
+        </div>
+        <div class="conf-bar"><div class="conf-fill" style="width:87%;background:var(--green);"></div></div>
+      </div>
+
+      <!-- Similar incidents -->
+      <div class="slabel">Similar Incidents</div>
+      <div class="sim-card" onclick="openModal('phone-analysis')">
+        <div>
+          <div style="font-size:12px;font-weight:600;color:var(--text-1);">INC-2026-017</div>
+          <div style="font-size:11px;color:var(--text-2);">PostgreSQL Pool Leak · 92% match</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span style="font-size:11px;color:var(--blue-text);">View</span>
+          <i class="ti ti-chevron-right" style="font-size:14px;color:var(--text-3)"></i>
+        </div>
+      </div>
+      <div class="sim-card" onclick="openModal('phone-analysis')">
+        <div>
+          <div style="font-size:12px;font-weight:600;color:var(--text-1);">INC-2026-029</div>
+          <div style="font-size:11px;color:var(--text-2);">HikariCP Session Overflow · 84% match</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span style="font-size:11px;color:var(--blue-text);">View</span>
+          <i class="ti ti-chevron-right" style="font-size:14px;color:var(--text-3)"></i>
+        </div>
+      </div>
+
+      <!-- Recommended fix flows -->
+      <div class="slabel">Recommended Fix Flows</div>
+      <div style="font-size:11px;color:var(--text-3);margin-bottom:12px;">Select a flow to attach it to this incident and begin workspace tracking.</div>
+
+      <div class="fixrow" id="ff1" onclick="selectFixFlow('ff1')">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">
+          <span style="font-size:13px;font-weight:600;color:var(--text-1);">1. Identify top connection consumers</span>
+          <span style="font-size:13px;font-weight:700;color:var(--green-text);">96%</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:11px;color:var(--text-2);">Progress: 2 / 4 completed</span>
+          <span style="font-size:10px;font-weight:600;color:var(--blue-text);background:var(--blue-dim);padding:2px 8px;border-radius:10px;">Attempted</span>
+        </div>
+      </div>
+
+      <div class="fixrow" id="ff2" onclick="selectFixFlow('ff2')">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">
+          <span style="font-size:13px;font-weight:600;color:var(--text-1);">2. Restart affected application pods</span>
+          <span style="font-size:13px;font-weight:700;color:var(--green-text);">91%</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:11px;color:var(--text-2);">Progress: 0 / 3 completed</span>
+          <span style="font-size:10px;font-weight:600;color:var(--text-3);background:var(--bg-2);padding:2px 8px;border-radius:10px;">Not started</span>
+        </div>
+      </div>
+
+      <div class="fixrow" id="ff3" onclick="selectFixFlow('ff3')">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">
+          <span style="font-size:13px;font-weight:600;color:var(--text-1);">3. Verify connection pool recovery</span>
+          <span style="font-size:13px;font-weight:700;color:var(--amber-text);">88%</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:11px;color:var(--text-2);">Progress: 0 / 2 completed</span>
+          <span style="font-size:10px;font-weight:600;color:var(--text-3);background:var(--bg-2);padding:2px 8px;border-radius:10px;">Not started</span>
+        </div>
+      </div>
+
+      <div class="fixrow" id="ff4" onclick="selectFixFlow('ff4')">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">
+          <span style="font-size:13px;font-weight:600;color:var(--text-1);">4. Patch connection lifecycle handling</span>
+          <span style="font-size:13px;font-weight:700;color:var(--amber-text);">79%</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:11px;color:var(--text-2);">Progress: 4 / 4 completed</span>
+          <span style="font-size:10px;font-weight:600;color:var(--blue-text);background:var(--blue-dim);padding:2px 8px;border-radius:10px;">Attempted</span>
+        </div>
+      </div>
+
+      <button class="btn-primary" style="margin-top:8px;" onclick="navTo('phone-workspace')" id="open-workspace-btn">Open Workspace with Selected Flow</button>
+      <div class="scroll-end"></div>
+    </div>
+
+    <!-- Incident Detail Dialog (modal) -->
+    <div class="modal-overlay" id="modal-analysis">
+      <div class="modal">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;">
+          <div>
+            <div style="font-size:10px;color:var(--text-2);margin-bottom:3px;">INC-2026-017</div>
+            <div style="font-size:15px;font-weight:600;color:var(--text-1);">PostgreSQL Pool Leak</div>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <span class="badge b-critical">Critical</span>
+            <div style="cursor:pointer;padding:4px;" onclick="closeModal('modal-analysis')"><i class="ti ti-x" style="font-size:17px;color:var(--text-2)"></i></div>
+          </div>
+        </div>
+        <div class="divider"></div>
+        <!-- Timeline -->
+        <div style="margin:12px 0 8px;font-size:11px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;">Timeline</div>
+        <div style="font-size:12px;color:var(--text-2);line-height:1.9;">
+          14:18 — Alert triggered<br>
+          14:21 — AI analysis completed<br>
+          14:22 — Fix Flow attached: Database Connection Recovery Flow<br>
+          14:24 — Restart initiated<br>
+          14:28 — Incident resolved
+        </div>
+        <div class="divider"></div>
+        <div style="margin:12px 0 6px;font-size:11px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;">Incident Summary</div>
+        <div style="font-size:12px;color:var(--text-2);line-height:1.8;margin-bottom:14px;">
+          <span style="color:var(--text-3);">Root cause:</span> HikariCP session leak on timeout<br>
+          <span style="color:var(--text-3);">Impact:</span> All API endpoints rejecting DB requests<br>
+          <span style="color:var(--text-3);">Fix flow:</span> Database Connection Recovery
+        </div>
+        <div style="font-size:11px;color:var(--text-3);margin-bottom:6px;">Memo</div>
+        <div style="background:var(--bg-0);border-radius:8px;padding:10px;font-size:12px;color:var(--text-2);line-height:1.6;margin-bottom:16px;">Restarted all api-gateway pods. Confirmed pool dropped to 12/100. Root cause patched in v2.4.1 deploy.</div>
+        <button class="btn-secondary" onclick="closeModal('modal-analysis')">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     6. INCIDENT DETAIL / WORKSPACE
+═══════════════════════════════════════════ -->
+<div class="screen-block">
+  <div class="screen-label">6 · Incident Workspace</div>
+  <div class="phone" id="phone-workspace">
+    <div class="sbar"><span>9:41</span><span style="display:flex;gap:5px;align-items:center;"><i class="ti ti-wifi" style="font-size:14px"></i><i class="ti ti-battery-2" style="font-size:14px"></i></span></div>
+    <div class="navbar">
+      <div class="back-btn" onclick="navTo('phone-analysis')"><i class="ti ti-arrow-left" style="font-size:17px;color:var(--text-2)"></i></div>
+      <div style="flex:1;"><div class="nav-title">INC-2026-041</div><div class="nav-sub">DB Connection Pool Exhausted</div></div>
+      <span class="badge b-critical">Critical</span>
+    </div>
+    <div class="content" style="padding-top:14px;">
+      <!-- Status row -->
+      <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+        <span class="badge b-inprog"><i class="ti ti-activity" style="font-size:10px"></i> In Progress</span>
+        <span style="font-size:11px;color:var(--text-2);display:flex;align-items:center;gap:4px;"><i class="ti ti-clock" style="font-size:12px"></i> 14:18 UTC · 23m</span>
+      </div>
+
+      <!-- Timeline -->
+      <div class="card">
+        <div style="font-size:12px;font-weight:600;color:var(--text-1);margin-bottom:12px;">Timeline</div>
+        <div style="display:flex;flex-direction:column;">
+          <div style="display:flex;gap:10px;">
+            <div class="tl-dot" style="background:var(--green);"></div>
+            <div><div style="font-size:12px;color:var(--text-1);">14:18 — Alert triggered</div><div style="font-size:11px;color:var(--text-2);">PagerDuty auto-detected pool exhaustion</div></div>
+          </div>
+          <div class="tl-line" style="margin-left:3.5px;"></div>
+          <div style="display:flex;gap:10px;">
+            <div class="tl-dot" style="background:var(--green);"></div>
+            <div><div style="font-size:12px;color:var(--text-1);">14:21 — AI analysis completed</div><div style="font-size:11px;color:var(--text-2);">87% confidence, root cause identified</div></div>
+          </div>
+          <div class="tl-line" style="margin-left:3.5px;"></div>
+          <div style="display:flex;gap:10px;">
+            <div class="tl-dot" style="background:var(--green);"></div>
+            <div><div style="font-size:12px;color:var(--text-1);">14:22 — Fix Flow attached</div><div style="font-size:11px;color:var(--text-2);">Database Connection Recovery Flow</div></div>
+          </div>
+          <div class="tl-line" style="margin-left:3.5px;"></div>
+          <div style="display:flex;gap:10px;">
+            <div class="tl-dot pulse" style="background:var(--blue);"></div>
+            <div><div style="font-size:12px;color:var(--text-1);">14:24 — Restart initiated</div><div style="font-size:11px;color:var(--text-2);">Worker pod restart in progress</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Resolution checklist -->
+      <div class="slabel">Resolution Checklist</div>
+      <div style="font-size:11px;color:var(--text-3);margin-bottom:10px;">Selected Fix Flow: Database Connection Recovery Flow · 2 of 4 steps</div>
+
+      <div style="margin-bottom:10px;">
+        <div style="height:4px;background:var(--bg-2);border-radius:2px;overflow:hidden;">
+          <div style="height:100%;width:50%;background:var(--green);border-radius:2px;"></div>
+        </div>
+      </div>
+
+      <div class="chk-item" onclick="toggleChk(this)">
+        <div class="chk-box done"><i class="ti ti-check" style="font-size:11px;color:var(--green)"></i></div>
+        <span style="font-size:13px;color:var(--text-2);text-decoration:line-through;text-decoration-color:var(--border-2);">Step 1 of 4 — Confirm affected service scope</span>
+      </div>
+      <div class="chk-item" onclick="toggleChk(this)">
+        <div class="chk-box done"><i class="ti ti-check" style="font-size:11px;color:var(--green)"></i></div>
+        <span style="font-size:13px;color:var(--text-2);text-decoration:line-through;text-decoration-color:var(--border-2);">Step 2 of 4 — Restart overloaded instances</span>
+      </div>
+      <div class="chk-item" onclick="toggleChk(this)">
+        <div class="chk-box"><i class="ti ti-check" style="font-size:11px;color:transparent"></i></div>
+        <span style="font-size:13px;color:var(--text-1);">Step 3 of 4 — Validate error rate normalization</span>
+      </div>
+      <div class="chk-item" onclick="toggleChk(this)">
+        <div class="chk-box"><i class="ti ti-check" style="font-size:11px;color:transparent"></i></div>
+        <span style="font-size:13px;color:var(--text-1);">Step 4 of 4 — Final resolution confirmation</span>
+      </div>
+
+      <!-- Notes -->
+      <div class="slabel">Notes</div>
+      <textarea class="field-input" rows="4" placeholder="Document findings and actions…">Connection pool maxed at 100/100. Spring Boot service leaking sessions on timeout paths. Restart of api-gateway pods cleared 80% of queue.</textarea>
+
+      <!-- Actions -->
+      <div style="display:flex;gap:10px;margin-top:8px;">
+        <button class="btn-secondary" style="flex:1;padding:12px 8px;font-size:13px;" onclick="navTo('phone-analysis')">Back to Analysis</button>
+        <button class="btn-primary" style="flex:1;padding:12px 8px;font-size:13px;" onclick="navTo('phone-resolve-confirm')">Mark Resolved</button>
+      </div>
+      <div class="scroll-end"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     6a. MARK AS RESOLVED — Confirmation
+═══════════════════════════════════════════ -->
+<div class="screen-block">
+  <div class="screen-label">6a · Mark as Resolved — Confirm</div>
+  <div class="phone" id="phone-resolve-confirm">
+    <div class="sbar"><span>9:41</span><span style="display:flex;gap:5px;align-items:center;"><i class="ti ti-wifi" style="font-size:14px"></i><i class="ti ti-battery-2" style="font-size:14px"></i></span></div>
+    <div class="navbar">
+      <div class="back-btn" onclick="navTo('phone-workspace')"><i class="ti ti-arrow-left" style="font-size:17px;color:var(--text-2)"></i></div>
+      <div><div class="nav-title">Mark as Resolved</div></div>
+    </div>
+    <div class="content" style="padding-top:40px;display:flex;flex-direction:column;align-items:center;text-align:center;">
+      <div style="width:68px;height:68px;border-radius:50%;background:var(--amber-dim);border:2px solid var(--amber);display:flex;align-items:center;justify-content:center;margin-bottom:18px;">
+        <i class="ti ti-alert-triangle" style="font-size:28px;color:var(--amber-text)"></i>
+      </div>
+      <div style="font-size:19px;font-weight:700;color:var(--text-1);margin-bottom:8px;">Resolve incident?</div>
+      <div style="font-size:13px;color:var(--text-2);line-height:1.7;margin-bottom:32px;">This will close INC-2026-041 and move it to the archive. Steps 3 &amp; 4 of the fix flow are still incomplete.</div>
+
+      <div style="width:100%;background:var(--bg-1);border:0.5px solid var(--border);border-radius:12px;padding:16px;margin-bottom:28px;text-align:left;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px;"><span style="font-size:12px;color:var(--text-2);">Incident</span><span style="font-size:12px;color:var(--text-1);">INC-2026-041</span></div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px;"><span style="font-size:12px;color:var(--text-2);">Duration</span><span style="font-size:12px;color:var(--text-1);">23 min</span></div>
+        <div style="display:flex;justify-content:space-between;"><span style="font-size:12px;color:var(--text-2);">Checklist</span><span style="font-size:12px;color:var(--amber-text);">2 / 4 steps done</span></div>
+      </div>
+
+      <div style="width:100%;display:flex;flex-direction:column;gap:10px;">
+        <button class="btn-primary" onclick="navTo('phone-resolved')">Yes, mark as resolved</button>
+        <button class="btn-secondary" onclick="navTo('phone-workspace')">Back to workspace</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     6b. RESOLVED — Success State
+═══════════════════════════════════════════ -->
+<div class="screen-block">
+  <div class="screen-label">6b · Resolved — Success</div>
+  <div class="phone" id="phone-resolved">
+    <div class="sbar"><span>9:41</span><span style="display:flex;gap:5px;align-items:center;"><i class="ti ti-wifi" style="font-size:14px"></i><i class="ti ti-battery-2" style="font-size:14px"></i></span></div>
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;text-align:center;">
+      <div class="success-ring">
+        <i class="ti ti-check" style="font-size:28px;color:var(--green)"></i>
+      </div>
+      <div style="font-size:22px;font-weight:700;color:var(--text-1);margin-bottom:8px;letter-spacing:-0.3px;">Incident resolved</div>
+      <div style="font-size:13px;color:var(--text-2);margin-bottom:32px;line-height:1.7;">INC-2026-041 has been closed and moved to the archive. The dashboard has been updated.</div>
+
+      <div style="width:100%;background:var(--bg-1);border:0.5px solid var(--border);border-radius:12px;padding:16px;text-align:left;margin-bottom:28px;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px;"><span style="font-size:12px;color:var(--text-2);">Resolved at</span><span style="font-size:12px;color:var(--text-1);">14:41 UTC</span></div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px;"><span style="font-size:12px;color:var(--text-2);">Total duration</span><span style="font-size:12px;color:var(--text-1);">23 min</span></div>
+        <div style="display:flex;justify-content:space-between;"><span style="font-size:12px;color:var(--text-2);">Status</span><span class="badge b-resolved" style="font-size:10px;">Resolved</span></div>
+      </div>
+
+      <button class="btn-primary" style="width:100%;" onclick="navTo('phone-dashboard')">Back to Dashboard</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     7. CLOSED INCIDENTS ARCHIVE
+═══════════════════════════════════════════ -->
+<div class="screen-block">
+  <div class="screen-label">7 · Closed Incidents Archive</div>
+  <div class="phone" id="phone-archive">
+    <div class="sbar"><span>9:41</span><span style="display:flex;gap:5px;align-items:center;"><i class="ti ti-wifi" style="font-size:14px"></i><i class="ti ti-battery-2" style="font-size:14px"></i></span></div>
+    <div class="navbar">
+      <div class="back-btn" onclick="navTo('phone-dashboard')"><i class="ti ti-arrow-left" style="font-size:17px;color:var(--text-2)"></i></div>
+      <div style="flex:1;"><div class="nav-title">Archive</div><div class="nav-sub">Resolved Incident History</div></div>
+      <div style="width:32px;height:32px;background:var(--bg-2);border:0.5px solid var(--border-2);border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;">
+        <i class="ti ti-filter" style="font-size:14px;color:var(--text-2)"></i>
+      </div>
+    </div>
+
+    <!-- Search bar -->
+    <div style="padding:8px 16px;border-bottom:0.5px solid var(--border);flex-shrink:0;">
+      <div style="background:var(--bg-1);border:0.5px solid var(--border-2);border-radius:10px;padding:9px 12px;display:flex;align-items:center;gap:8px;">
+        <i class="ti ti-search" style="font-size:15px;color:var(--text-3)"></i>
+        <span style="font-size:13px;color:var(--text-3);">Search incidents…</span>
+      </div>
+    </div>
+
+    <div class="content" style="padding-top:14px;">
+      <div style="font-size:11px;color:var(--text-2);margin-bottom:12px;">3 resolved incidents</div>
+
+      <div class="card-sm" style="display:flex;align-items:center;gap:12px;cursor:pointer;" onclick="openModal('phone-archive')">
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:10px;color:var(--text-2);margin-bottom:3px;">INC-2026-040 · <span style="color:var(--green-text);">closed</span></div>
+          <div style="font-size:13px;font-weight:600;color:var(--text-1);margin-bottom:3px;">Scheduled Job Queue Backlog</div>
+          <div style="font-size:11px;color:var(--text-2);display:flex;align-items:center;gap:5px;"><i class="ti ti-clock" style="font-size:11px"></i> 23 min resolution</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
+          <span class="badge b-minor">Minor</span>
+          <i class="ti ti-chevron-right" style="font-size:15px;color:var(--text-3)"></i>
+        </div>
+      </div>
+
+      <div class="card-sm" style="display:flex;align-items:center;gap:12px;cursor:pointer;" onclick="openModal('phone-archive')">
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:10px;color:var(--text-2);margin-bottom:3px;">INC-2026-039 · <span style="color:var(--green-text);">closed</span></div>
+          <div style="font-size:13px;font-weight:600;color:var(--text-1);margin-bottom:3px;">CDN Cache Stale on Edge Nodes</div>
+          <div style="font-size:11px;color:var(--text-2);display:flex;align-items:center;gap:5px;"><i class="ti ti-clock" style="font-size:11px"></i> 41 min resolution</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
+          <span class="badge b-major">Major</span>
+          <i class="ti ti-chevron-right" style="font-size:15px;color:var(--text-3)"></i>
+        </div>
+      </div>
+
+      <div class="card-sm" style="display:flex;align-items:center;gap:12px;cursor:pointer;" onclick="openModal('phone-archive')">
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:10px;color:var(--text-2);margin-bottom:3px;">INC-2026-038 · <span style="color:var(--green-text);">closed</span></div>
+          <div style="font-size:13px;font-weight:600;color:var(--text-1);margin-bottom:3px;">Redis Cluster Memory Threshold</div>
+          <div style="font-size:11px;color:var(--text-2);display:flex;align-items:center;gap:5px;"><i class="ti ti-clock" style="font-size:11px"></i> 67 min resolution</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
+          <span class="badge b-critical">Critical</span>
+          <i class="ti ti-chevron-right" style="font-size:15px;color:var(--text-3)"></i>
+        </div>
+      </div>
+    </div>
+
+    <!-- Archive detail modal -->
+    <div class="modal-overlay" id="modal-archive">
+      <div class="modal">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;">
+          <div>
+            <div style="font-size:10px;color:var(--text-2);margin-bottom:3px;">INC-2026-040</div>
+            <div style="font-size:15px;font-weight:600;color:var(--text-1);">Scheduled Job Queue Backlog</div>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <span class="badge b-closed">Closed</span>
+            <div style="cursor:pointer;padding:4px;" onclick="closeModal('modal-archive')"><i class="ti ti-x" style="font-size:17px;color:var(--text-2)"></i></div>
+          </div>
+        </div>
+        <div class="divider"></div>
+        <div style="margin:12px 0 8px;font-size:11px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;">Timeline</div>
+        <div style="font-size:12px;color:var(--text-2);line-height:1.9;margin-bottom:14px;">
+          13:55 — Alert triggered<br>
+          13:57 — AI analysis completed<br>
+          13:58 — Fix Flow attached<br>
+          14:04 — Worker scaling applied<br>
+          14:18 — Incident resolved
+        </div>
+        <div class="divider"></div>
+        <div style="margin:12px 0 6px;font-size:11px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;">Incident Summary</div>
+        <div style="font-size:12px;color:var(--text-2);line-height:1.8;margin-bottom:6px;">
+          <span style="color:var(--text-3);">Root cause:</span> Cron job backlog from under-provisioned workers<br>
+          <span style="color:var(--text-3);">Impact:</span> Delayed scheduled tasks by 12–20 min<br>
+          <span style="color:var(--text-3);">Fix flow:</span> Horizontal Worker Scaling<br>
+          <span style="color:var(--text-3);">Resolution time:</span> 23 min
+        </div>
+        <div style="font-size:11px;color:var(--text-3);margin:10px 0 6px;">Memo</div>
+        <div style="background:var(--bg-0);border-radius:8px;padding:10px;font-size:12px;color:var(--text-2);line-height:1.6;margin-bottom:16px;">Scaled worker replicas from 3→8. Queue cleared within 6 minutes. Added auto-scaling rule for queue depth > 500.</div>
+        <button class="btn-secondary" onclick="closeModal('modal-archive')">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- end proto-wrap -->
+
+<script>
+  // ── Simple cross-phone navigation ──
+  // Each phone has its own ID; navTo scrolls to it & highlights
+  function navTo(id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.style.border = '2px solid #1f6feb';
+    el.style.borderRadius = '44px';
+    setTimeout(function() { el.style.border = '1.5px solid #30363d'; }, 1400);
+  }
+
+  // ── Login attempt simulation ──
+  function loginAttempt() {
+    var email = document.getElementById('login-email').value;
+    var pass  = document.getElementById('login-pass').value;
+    if (!email || !pass) {
+      document.getElementById('login-err').classList.add('show');
+      document.getElementById('login-email').classList.add('error');
+      document.getElementById('login-pass').classList.add('error');
+    } else {
+      navTo('phone-dashboard');
+    }
+  }
+
+  // ── Checklist toggle ──
+  function toggleChk(el) {
+    var box = el.querySelector('.chk-box');
+    var txt = el.querySelector('span');
+    var icon = box.querySelector('i');
+    if (box.classList.contains('done')) {
+      box.classList.remove('done');
+      icon.style.color = 'transparent';
+      txt.style.textDecoration = 'none';
+      txt.style.color = 'var(--text-1)';
+    } else {
+      box.classList.add('done');
+      icon.style.color = 'var(--green)';
+      txt.style.textDecoration = 'line-through';
+      txt.style.textDecorationColor = 'var(--border-2)';
+      txt.style.color = 'var(--text-2)';
+    }
+  }
+
+  // ── Fix flow selection ──
+  var selectedFlow = null;
+  function selectFixFlow(id) {
+    ['ff1','ff2','ff3','ff4'].forEach(function(f) {
+      document.getElementById(f).classList.remove('selected');
+    });
+    document.getElementById(id).classList.add('selected');
+    selectedFlow = id;
+  }
+
+  // ── Severity selector ──
+  function selSev(el) {
+    el.closest('div').querySelectorAll('.sel-chip').forEach(function(c) {
+      c.classList.remove('on','crit-on','major-on','minor-on');
+      c.style.borderColor = '';
+    });
+    el.classList.add('on');
+  }
+
+  // ── Modal helpers ──
+  function openModal(phoneId) {
+    var phone = document.getElementById(phoneId);
+    if (!phone) return;
+    var suffix = phoneId === 'phone-analysis' ? 'analysis' : 'archive';
+    var modal = document.getElementById('modal-' + suffix);
+    if (modal) modal.classList.add('open');
+  }
+  function closeModal(id) {
+    var el = document.getElementById(id);
+    if (el) el.classList.remove('open');
+  }
+</script>
+</body>
+</html>
