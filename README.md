@@ -225,6 +225,8 @@ sentinel_mvp/
 | [Frontend Architecture](./sdd/frontend/10_frontend_arch.md) | Flutter structure, design system, routing |
 | [Deployment Spec](./sdd/infra/11_deployment_spec.md) | GCP services, CI/CD, environment config |
 | [Testing Spec](./sdd/infra/12_testing_spec.md) | Unit, widget, integration, and API tests |
+| [Architecture Decisions](./sdd/architecture/decisions/000_index.md) | ADRs — why, not what; see spec for what |
+| [Release Index](./release/000_index.md) | Currently released versions; outside `sdd/` by design |
 
 ---
 

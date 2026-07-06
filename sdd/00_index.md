@@ -122,6 +122,16 @@ Authentication is a system capability that spans backend, frontend, and infrastr
 
 ---
 
+## Release
+
+Lives outside `sdd/` deliberately — records what was actually deployed, not what the system is designed to be. Specs remain unaware of it; see [`release/000_index.md`](../release/000_index.md).
+
+| Document | Purpose |
+|----------|---------|
+| [Release Index](../release/000_index.md) | Currently released versions, rules, structure |
+
+---
+
 ## Design References
 
 All screen PNGs are in `/sentinel_screen_ref/`.

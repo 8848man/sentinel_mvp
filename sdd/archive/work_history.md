@@ -1,3 +1,9 @@
+# Work History (Archived)
+
+**Archived:** Superseded by `release/` (see [Release Index](../../release/000_index.md)) as of the Sentinel Development Operating Model rollout, 2026-07-06. Entries below have been migrated as rollups into `release/project/2026.md`; this file is preserved as the original per-commit detail for historical reference and is no longer appended to.
+
+---
+
 ## 2026-07-01
 
 ### Production Release — feat/ocr merged to main and deployed
