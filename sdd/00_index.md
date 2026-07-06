@@ -16,11 +16,32 @@
 
 ---
 
+## Analysis Workflow
+
+Cross-layer specifications that span Frontend, Backend, and QA. These documents are authoritative for the full workflow and must be referenced — not duplicated — by layer-specific implementation documents.
+
+| Document | Purpose |
+|----------|---------|
+| [SPEC-ANALYSIS-001](./analysis/SPEC-ANALYSIS-001.md) | Project-level authoritative spec for `/incidents/{id}/analysis`: state machine, event model, adaptive polling, backend API contract, UX rendering, edge cases |
+
+---
+
 ## Domain
 
 | Document | Purpose |
 |----------|---------|
 | [State Machines](./domain/state_machines.md) | Incident, AIAction, AnalysisStatus, FixFlow, Timeline lifecycles |
+
+---
+
+## Architecture Decisions
+
+Records *why* — not duplicated in specs, which record *what*. See [ADR Index](./architecture/decisions/000_index.md) for the lifecycle and the trigger rule for when a new ADR is required.
+
+| Document | Purpose |
+|----------|---------|
+| [ADR Index](./architecture/decisions/000_index.md) | Full list of ADRs with status |
+| [ADR Template](./architecture/decisions/ADR-0000-template.md) | Format for new ADRs |
 
 ---
 
@@ -88,6 +109,7 @@ Authentication is a system capability that spans backend, frontend, and infrastr
 | 10.5 | [Responsive: Archive](./frontend/10_5_responsive_archive.md) | Archive table → card list |
 | 10.6 | [Responsive: Auth & Dialogs](./frontend/10_6_responsive_auth_dialogs.md) | Login/Signup card, Detail Dialog |
 | 10.7 | [Responsive: Mobile IA](./frontend/10_7_responsive_mobile_ia.md) | Mobile navigation/IA |
+| 10.8 | [Analysis Route (reference)](./frontend/10_8_analysis_route_polling.md) | Stub — authoritative spec relocated to `sdd/analysis/SPEC-ANALYSIS-001.md` |
 
 ---
 

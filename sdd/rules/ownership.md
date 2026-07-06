@@ -17,6 +17,7 @@
 | **Frontend** | `frontend/sentinel/lib/**`, `frontend/sentinel/pubspec.yaml` | `backend/`, `database/`, `sdd/` documents |
 | **QA** | `backend/tests/**`, `frontend/sentinel/test/**` | Any `backend/app/` or `frontend/lib/` source file |
 | **DevOps** | `deployment/`, `backend/Dockerfile`, `firebase.json`, `.env.example`, `scripts/` | `backend/app/` source code, `frontend/sentinel/lib/` |
+| **Architecture** | `sdd/architecture/decisions/**` (ADRs) | Any implementation source file — an ADR records a decision, it does not implement one |
 
 ---
 
@@ -29,6 +30,8 @@
 **Frontend ↔ Backend:** Any API response shape change requires updating both the Pydantic schema (Backend) and the Flutter entity + `fromJson` (Frontend) in the same session. See [Decision Flow §1 and §4](../workflow/02_decision_flow.md).
 
 **Context ↔ All:** New screens require Context area sign-off before Frontend implements. New endpoints require alignment with `05_api_spec.md` before Backend implements.
+
+**Architecture ↔ All:** An ADR whose consequences span more than one area requires sign-off from every affected area before `Status: Accepted`. See `sdd/workflow/02_decision_flow.md` Decision 9 for when an ADR is required at all.
 
 ---
 
