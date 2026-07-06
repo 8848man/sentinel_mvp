@@ -1,7 +1,7 @@
 # 05 — API Specification
 
 **Base URL:** `/api/v1`  
-**Auth:** All endpoints require `Authorization: Bearer <supabase_jwt>` except health.  
+**Auth:** All endpoints require `Authorization: Bearer <jwt>` except health. Accepts either a Supabase-issued ES256 JWT or (dev-only, `ENABLE_DEV_AUTH=True`) an HS256 dev token — see [Auth Overview](../auth/00_overview.md).  
 **Refs:** → [DB Schema](./06_database_schema.md) · [Backend Arch](./09_backend_arch.md) · [AI Integration](./08_ai_integration_spec.md)
 
 ---
@@ -135,6 +135,22 @@ Response 200: `{ "id": "uuid", "status": "resolved", "resolved_at": "..." }`
 Transitions `resolved` → `in_progress`.
 
 Response 200: `{ "id": "uuid", "status": "in_progress" }`
+
+---
+
+### `PATCH /incidents/{id}/close`
+
+Transitions `resolved` → `closed`. Appends an `actor_type: "operator"`, `event_type: "incident_closed"` timeline event.
+
+Response 200: `{ "id": "uuid", "status": "closed" }`
+
+---
+
+### `GET /incidents/{id}/analysis-status`
+
+Minimal status-only endpoint used for efficient polling during async analysis. Full contract (state machine, polling algorithm, response shape) is authoritative in [SPEC-ANALYSIS-001](../analysis/SPEC-ANALYSIS-001.md) — not duplicated here.
+
+Response 200: `{ "incident_id": "uuid", "analysis_status": "pending|processing|completed|failed", "analysis_error": null }`
 
 ---
 

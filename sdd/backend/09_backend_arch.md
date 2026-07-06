@@ -22,7 +22,8 @@ backend/app/
 │   ├── fix_flows.py     # PATCH /fix-flows/{id}/attempted
 │   ├── archive.py       # GET /archive
 │   ├── auth.py          # POST /auth/register (dev-only convenience)
-│   └── ocr.py           # POST /ocr/extract-log
+│   ├── ocr.py           # POST /ocr/extract-log
+│   └── dev.py           # POST /dev/token — conditionally registered only when ENABLE_DEV_AUTH=True (see sdd/auth/03_development.md)
 ├── models/
 │   └── models.py        # SQLAlchemy ORM (all tables)
 ├── schemas/

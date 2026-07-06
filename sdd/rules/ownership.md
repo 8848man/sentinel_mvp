@@ -16,7 +16,7 @@
 | **AI Platform** | `backend/app/services/gemini_service.py`, `backend/app/ai_platform/**`, `backend/app/services/ai_action_service.py`, `sdd/backend/08_ai_integration_spec.md`, `sdd/backend/08_1_ocr_ai_integration.md` | `backend/app/routers/*.py`, `backend/app/services/incident_service.py` (coordinate) |
 | **Frontend** | `frontend/sentinel/lib/**`, `frontend/sentinel/pubspec.yaml` | `backend/`, `database/`, `sdd/` documents |
 | **QA** | `backend/tests/**`, `frontend/sentinel/test/**` | Any `backend/app/` or `frontend/lib/` source file |
-| **DevOps** | `deployment/`, `backend/Dockerfile`, `firebase.json`, `.env.example` | `backend/app/` source code, `frontend/sentinel/lib/` |
+| **DevOps** | `deployment/`, `backend/Dockerfile`, `firebase.json`, `.env.example`, `scripts/` | `backend/app/` source code, `frontend/sentinel/lib/` |
 
 ---
 
