@@ -33,4 +33,28 @@ class AppConfig {
         'dev' => AuthProviderMode.dev,
         _ => AuthProviderMode.supabase,
       };
+
+  static const String supabaseUrl = String.fromEnvironment('SUPABASE_URL');
+  static const String supabaseAnonKey =
+      String.fromEnvironment('SUPABASE_ANON_KEY');
+
+  /// Fails fast with a readable message instead of letting an empty
+  /// SUPABASE_URL/SUPABASE_ANON_KEY reach the Supabase SDK, where it would
+  /// silently produce relative-URL requests and an HTML→JSON parse error
+  /// at sign-in time instead of a clear startup failure.
+  static void validate() {
+    if (authProvider != AuthProviderMode.supabase) return;
+    final missing = [
+      if (supabaseUrl.isEmpty) 'SUPABASE_URL',
+      if (supabaseAnonKey.isEmpty) 'SUPABASE_ANON_KEY',
+    ];
+    if (missing.isNotEmpty) {
+      throw StateError(
+        'Missing required --dart-define for AUTH_PROVIDER=supabase: '
+        '${missing.join(', ')}. Pass them at build/run time, or use '
+        '--dart-define=AUTH_PROVIDER=mock (UI-only) or '
+        '--dart-define=AUTH_PROVIDER=dev (local backend) instead.',
+      );
+    }
+  }
 }

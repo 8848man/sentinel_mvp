@@ -113,16 +113,55 @@ Migrations are located at `backend/alembic/versions/`. Never run `init_db()` aga
 
 ## Frontend: Firebase Hosting
 
-```bash
-# Build Flutter web
-flutter build web --release \
-  --dart-define=SUPABASE_URL=https://<project>.supabase.co \
-  --dart-define=SUPABASE_ANON_KEY=<anon-key> \
-  --dart-define=API_BASE_URL=https://sentinel-backend-<hash>-an.a.run.app
+**Deployments must go through `scripts/deploy_web.sh` — never invoke `flutter build web` / `firebase deploy` by hand.** The script is the single source of truth for which `--dart-define` flags a deploy needs; hand-typed commands are how `SUPABASE_URL`/`SUPABASE_ANON_KEY` get forgotten and ship an app that initializes Supabase with an empty URL (see [Auth Overview](../auth/00_overview.md) for the failure mode this causes at sign-in).
 
-# Deploy
-firebase deploy --only hosting
+### Deployment architecture
+
 ```
+developer / CI runner
+       │
+       │  SUPABASE_URL, SUPABASE_ANON_KEY, API_BASE_URL (env vars or scripts/.env.<environment>)
+       ▼
+scripts/deploy_web.sh <production|staging>
+       │
+       ├── 1. flutter build web --release --dart-define=... (frontend/sentinel)
+       └── 2. firebase deploy --only hosting --project <project>
+                      │
+                      ▼
+              Firebase Hosting (CDN) ── frontend/sentinel/firebase.json, .firebaserc
+```
+
+### Required environment variables (script inputs)
+
+| Variable | Required for | Purpose |
+|----------|--------------|---------|
+| `SUPABASE_URL` | `production` | Supabase project URL baked into the build via `--dart-define` |
+| `SUPABASE_ANON_KEY` | `production` | Supabase anon key baked into the build via `--dart-define` |
+| `API_BASE_URL` | `production` | Backend Cloud Run URL baked into the build via `--dart-define` |
+| `FIREBASE_PROJECT` | optional | Overrides the default Firebase project (`sentinel-mvp-eeeee`) |
+
+The script fails immediately with a readable error if a required variable is missing — it never proceeds to `flutter build` with a blank value. Values may also be supplied via a local, gitignored `scripts/.env.production` (or `.env.staging`) file, which the script sources automatically if present.
+
+### Deployment workflow
+
+```bash
+# One-time: authenticate the Firebase CLI
+firebase login
+
+# Production deploy
+SUPABASE_URL=https://<project>.supabase.co \
+SUPABASE_ANON_KEY=<anon-key> \
+API_BASE_URL=https://sentinel-backend-<hash>-an.a.run.app \
+./scripts/deploy_web.sh production
+```
+
+`AUTH_PROVIDER=supabase`, `USE_MOCK_DATA=false`, and `SKIP_EMAIL_VERIFICATION=false` are hardcoded into the script's `production` case — a production deploy can never accidentally ship with mock data or the dev auth provider active.
+
+**Staging** is stubbed in the script (`scripts/deploy_web.sh`, `staging` case) and exits with an explanatory error until a staging Supabase project + Cloud Run backend exist. To enable it: provision those resources, then fill in the staging branch (mirrors the `production` case) and set the corresponding variables via `scripts/.env.staging` or CI substitutions.
+
+### CI (Cloud Build)
+
+`deployment/cloudbuild.yaml`'s `frontend-build` step passes the same three "hardening" defines (`AUTH_PROVIDER=supabase`, `USE_MOCK_DATA=false`, `SKIP_EMAIL_VERIFICATION=false`) directly as `flutter build web` args, since Cloud Build steps run in per-tool containers (a `flutter` image, then a separate `firebase` image) and can't invoke the bash script as a single unit the way a local/production deploy can. Keep these two flows in parity by hand if either one's dart-define list changes.
 
 **firebase.json:**
 ```json
@@ -208,6 +247,11 @@ substitutions:
 
 | Variable | Purpose |
 |----------|---------|
-| `SUPABASE_URL` | Supabase project URL for Flutter Supabase SDK |
-| `SUPABASE_ANON_KEY` | Supabase anon key for Flutter Supabase SDK |
+| `AUTH_PROVIDER` | `supabase` (default) \| `mock` \| `dev`. Must be `supabase` in production — see [Auth Overview](../auth/00_overview.md) |
+| `SUPABASE_URL` | Supabase project URL for Flutter Supabase SDK. Required when `AUTH_PROVIDER=supabase`; `AppConfig.validate()` in `main.dart` throws a readable `StateError` at startup if missing instead of letting the SDK initialize with an empty URL |
+| `SUPABASE_ANON_KEY` | Supabase anon key for Flutter Supabase SDK. Same fail-fast behavior as `SUPABASE_URL` |
 | `API_BASE_URL` | Backend Cloud Run URL |
+| `USE_MOCK_DATA` | Must be `false` in production (defaults to `true`) |
+| `SKIP_EMAIL_VERIFICATION` | Must be `false` in production (defaults to `true`) |
+
+`scripts/deploy_web.sh` sets all of these correctly for `production`; do not pass them by hand.

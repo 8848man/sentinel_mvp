@@ -7,10 +7,12 @@ import 'core/config/app_config.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  AppConfig.validate();
+
   if (AppConfig.authProvider == AuthProviderMode.supabase) {
     await Supabase.initialize(
-      url: const String.fromEnvironment('SUPABASE_URL'),
-      anonKey: const String.fromEnvironment('SUPABASE_ANON_KEY'),
+      url: AppConfig.supabaseUrl,
+      anonKey: AppConfig.supabaseAnonKey,
     );
   }
 

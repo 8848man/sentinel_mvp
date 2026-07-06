@@ -669,5 +669,5 @@ Execute steps in this order. Each step must pass before the next begins.
 - [ ] **14.** `lib/features/auth/data/repositories/mock_auth_repository.dart` — Implement `getAccessToken()`
 - [ ] **15.** `lib/features/auth/data/repositories/dev_auth_repository.dart` — Create full implementation
 - [ ] **16.** `lib/features/auth/data/providers/auth_repository_provider.dart` — Add `AuthProviderMode.dev` case
-- [ ] **17.** `lib/main.dart` — Conditional `Supabase.initialize()`
-- [ ] **18.** `lib/core/api/api_client.dart` — Replace `_resolveToken()` with `getAccessToken()`
+- [x] **17.** `lib/main.dart` — Conditional `Supabase.initialize()` (also added `AppConfig.validate()` fail-fast check — see [Deployment Spec](../infra/11_deployment_spec.md))
+- [x] **18.** `lib/core/api/api_client.dart` — Replace `_resolveToken()` with `getAccessToken()`
