@@ -1,4 +1,8 @@
-# Spec Compliance Report
+# Spec Compliance Report (Archived — Original)
+
+**Archived:** The compliance audit below has been resolved (the responsive strategy split it recommends was completed). See [`sdd/spec_compliance_report.md`](../spec_compliance_report.md) for the current stub. Preserved here as the original finding for historical reference.
+
+---
 
 Audit against `sdd/rules/spec_authoring_rules.md` (target 50–150 lines, soft limit 200, hard limit 300). No files modified — report only.
 
