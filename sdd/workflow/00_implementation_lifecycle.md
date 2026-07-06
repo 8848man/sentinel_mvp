@@ -1,8 +1,24 @@
 # Implementation Lifecycle
 
-**Refs:** → [Context Loading](./01_context_loading.md) · [Decision Flow](./02_decision_flow.md) · [Validation](./03_validation.md)
+**Refs:** → [Context Loading](./01_context_loading.md) · [Decision Flow](./02_decision_flow.md) · [Validation](./03_validation.md) · [ADR Index](../architecture/decisions/000_index.md) · [Release Index](../../release/000_index.md)
 
-Every implementation task — regardless of type — follows this sequence. No phase is optional.
+Every implementation task — regardless of type — follows this sequence. No phase is optional. This runs automatically for every implementation task; the user does not need to request it.
+
+---
+
+## Specification-First Policy
+
+Before implementing, resolve to exactly one of:
+
+| Outcome | Meaning | Action |
+|---|---|---|
+| **A — Covered** | Spec already describes this behavior correctly | Proceed to implementation |
+| **B — Requires modification** | Spec is silent, incomplete, or intentionally changing | Update the spec *first*, same task, before writing code |
+| **C — Conflict** | Spec and running code disagree, and neither is being intentionally changed by this task | Stop. Report the conflict before the task is considered complete — do not silently implement around it. Resolve which side is authoritative via Decision 8 in [Decision Flow](./02_decision_flow.md), then correct the loser |
+
+Implementation must never silently become the source of truth by omission — this is precisely how `sdd/backend/06_database_schema.md`'s migration list and `sdd/backend/05_api_spec.md`'s endpoint coverage fell behind before the 2026-07 SDD consistency audit.
+
+**Calibration:** every phase below is mandatory to *evaluate*. "No change required" is a valid, expected, frequent result — it is not the same as skipping the phase.
 
 ---
 
@@ -55,6 +71,8 @@ Consult `sdd/workflow/02_decision_flow.md` for:
 
 If your change fits a defined flow, follow it exactly.  
 If it doesn't, note the gap and proceed with the code-first analysis outcome.
+
+**ADR Decision (mandatory sub-step):** does this change meet any of Decision 9's triggers (spans more than one `sdd/rules/ownership.md` area; expensive to reverse; chosen among real alternatives; not reconstructible from code alone)? If yes, write or supersede an ADR under `sdd/architecture/decisions/` *before* implementing — architecture must never evolve silently. If no, proceed. Never implement an architecture-breaking change without either referencing an existing ADR or creating a new one.
 
 ---
 
@@ -147,3 +165,43 @@ For any change that touches the API contract or DB schema, verify the other side
 | AI action produces new output | Is the handler's `output_schema_version` bumped? |
 
 The cross-boundary check is the most commonly skipped phase. The validation report in the execution context audit found the entire AI Platform invisible to the frontend because this check was not run.
+
+---
+
+## Phase 9 — Release Decision
+
+Evaluate — do not assume "no":
+
+- Was this change **actually deployed** in this task (not just committed)? If yes: add an entry to the relevant `release/frontend/`, `release/backend/`, or both, and roll it up in `release/project/`. Reference the git tag that was deployed — never a raw commit hash. If no: skip. A commit is not a release.
+- Does a version bump apply? Frontend (`pubspec.yaml`) and backend (`app/main.py`) version independently.
+
+---
+
+## SDD Drift Check (mandatory close-out, every task)
+
+The task is not complete until this has run and its findings — including "no drift found" — are stated:
+
+1. **Implementation ↔ Specification** — does the changed code still match what the relevant spec(s) say?
+2. **Architecture ↔ ADR** — if this touched an area governed by an existing ADR, does the implementation still honor it? If not, the implementation is wrong, or the ADR needs superseding — resolve, don't leave ambiguous.
+3. **Release ↔ Current state** — if release docs exist for the affected component, do they still describe what's actually deployed?
+4. **Folder ownership** — does `sdd/rules/ownership.md` still correctly describe who owns what touched by this task?
+5. **Obsolete documentation** — did this task make any doc obsolete? Archive it under `sdd/archive/` (preserve, never delete) rather than leaving two live, contradicting copies.
+
+## Artifact Decision Matrix (mandatory output, every task)
+
+State explicitly, as a table, at the end of every implementation task:
+
+| Artifact | Change? | Reasoning |
+|---|---|---|
+| Specification | Yes / No | one line |
+| ADR | Yes / No | one line — which Decision 9 trigger fired, or why none did |
+| Release | Yes / No | one line — was this actually deployed, or pending |
+| Validation | which levels ran | reference `03_validation.md` |
+| Version | Yes / No / which component | |
+| Git Commit | Yes / No | which spec/ADR it references |
+
+---
+
+## Repository Maintainer Responsibilities
+
+Claude operates as a repository maintainer on this codebase, not a code generator. Concretely: protect the specification (never let code become the unwritten source of truth); prevent documentation drift (run the SDD Drift Check without being asked); identify missing ADRs proactively (Decision 9); archive obsolete documentation rather than deleting or duplicating it; refuse architecture-breaking implementations that reference no ADR and create none; avoid duplicating what `git log`/`git blame` already do well; never place a commit hash, PR number, or branch name inside a Specification or an ADR's Decision/Consequences body (optional trailing metadata only) — this is what keeps `sdd/` reusable if this repository ever disappears.

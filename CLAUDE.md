@@ -66,7 +66,13 @@ Runtime behavior is controlled by `--dart-define` flags, not `.env`. See `lib/co
 
 **Database (dev vs prod):** Dev uses SQLite (auto-created on startup). Prod uses PostgreSQL managed exclusively by Alembic. Never run `init_db()` in prod.
 
-**Source of truth principle:** When code and a spec disagree, the code is correct. Specs describe design intent; implementation may have diverged. Always read the actual source first.
+**Source of truth principle (superseded 2026-07-06 — see Sentinel Development Operating Model below):** Specification is the source of truth; implementation must never become the source of truth by omission. Always read the actual source first — code is evidence of *current* behavior — but when code and spec disagree, that is a conflict to resolve (via `sdd/workflow/02_decision_flow.md` Decision 8), not a default in code's favor.
+
+---
+
+## Sentinel Development Operating Model
+
+Every implementation task automatically follows the Specification-First policy and full lifecycle in `sdd/workflow/00_implementation_lifecycle.md` — including the ADR Decision, SDD Drift Check, and Artifact Decision Matrix. This runs by default; do not wait to be asked.
 
 ---
 
@@ -74,10 +80,10 @@ Runtime behavior is controlled by `--dart-define` flags, not `.env`. See `lib/co
 
 ```
 1. Read this file (already done)
-2. Read sdd/workflow/00_implementation_lifecycle.md  ← mandatory process
+2. Read sdd/workflow/00_implementation_lifecycle.md  ← mandatory process, incl. Specification-First policy
 3. Read sdd/workflow/01_context_loading.md           ← which docs to load for your task
 4. Load only the documents listed for your task type
-5. Follow the lifecycle: Read → Analyze → Implement → Verify → Validate → Sync Docs
+5. Follow the lifecycle: Read → Analyze → Decide (Spec/ADR) → Implement → Verify → Validate → Drift Check → Sync Docs
 ```
 
 ---
@@ -91,4 +97,6 @@ Decision flows: `sdd/workflow/02_decision_flow.md`
 Validation spec: `sdd/workflow/03_validation.md`  
 State machines: `sdd/domain/state_machines.md`  
 Spec authoring rules: `sdd/rules/spec_authoring_rules.md`  
-File ownership: `sdd/rules/ownership.md`
+File ownership: `sdd/rules/ownership.md`  
+Architecture decisions (ADR): `sdd/architecture/decisions/000_index.md`  
+Release index: `release/000_index.md` (outside `sdd/` by design — specs remain unaware of it)

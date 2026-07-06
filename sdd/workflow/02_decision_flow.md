@@ -166,3 +166,22 @@ When the spec and the code disagree, follow this order to determine which is cor
 ```
 
 After resolving: **update the losing document** to match the winner. Never leave a known divergence undocumented.
+
+---
+
+## Decision 9 — Deciding Whether a Change Needs an ADR
+
+**Source of truth:** `sdd/architecture/decisions/000_index.md`
+
+An ADR is required if the change meets **any** of these:
+
+```
+- Spans more than one area in sdd/rules/ownership.md's ownership table
+- Is expensive or risky to reverse later
+- Was chosen among genuinely viable alternatives that were seriously considered
+- Would not be reconstructible by a future reader just from reading the resulting code
+```
+
+If yes: write the ADR (or supersede an existing one — never edit an Accepted ADR's Decision/Consequences in place) *before* implementing. The ADR must reference the spec(s) it affects; it must never reference a Release, and must never require a commit hash to be understood (optional trailing metadata only).
+
+**An ADR is never required for:** routine CRUD endpoints, a new AI Platform handler following the existing registered pattern (Decision 3), a new screen following an existing reference (Decision 7), bug fixes, or most refactors. Forcing one here is overhead `sdd/rules/spec_authoring_rules.md` already argues against.
