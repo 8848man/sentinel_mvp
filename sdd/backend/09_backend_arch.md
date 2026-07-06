@@ -1,63 +1,80 @@
 # 09 — Backend Architecture
 
-**Framework:** FastAPI (Python 3.12)  
-**Refs:** → [API Spec](./05_api_spec.md) · [Auth Spec](./07_auth_spec.md) · [AI Integration Spec](./08_ai_integration_spec.md)
+**Framework:** FastAPI (Python 3.12, async)  
+**Refs:** → [API Spec](./05_api_spec.md) · [Auth](../auth/00_overview.md) · [AI Integration](./08_ai_integration_spec.md)
 
 ---
 
 ## Folder Structure
 
 ```
-backend/
-├── app/
-│   ├── main.py              # FastAPI app factory, CORS, router registration
-│   ├── core/
-│   │   ├── config.py        # Pydantic Settings (env vars)
-│   │   ├── database.py      # SQLAlchemy async engine + session factory
-│   │   └── auth.py          # JWT validation, get_current_user dependency
-│   ├── routers/
-│   │   ├── incidents.py     # /incidents CRUD + analyze-metadata endpoint
-│   │   ├── checklist.py     # /checklist/{item_id} PATCH
-│   │   ├── notes.py         # /incidents/{id}/note PUT
-│   │   ├── timeline.py      # /incidents/{id}/timeline GET
-│   │   ├── fix_flows.py     # /fix-flows/{id}/attempted PATCH
-│   │   └── archive.py       # /archive GET
-│   ├── models/
-│   │   └── models.py        # SQLAlchemy ORM models (all tables)
-│   ├── schemas/
-│   │   ├── incident.py      # Pydantic request/response schemas for incidents
-│   │   ├── checklist.py     # Pydantic schemas for checklist items
-│   │   ├── fix_flow.py      # Pydantic schemas for fix flows
-│   │   ├── note.py          # Pydantic schemas for notes
-│   │   └── analysis.py      # Pydantic schemas for AI responses
-│   └── services/
-│       ├── gemini_service.py    # Gemini API calls, prompt templates, parsing
-│       └── incident_service.py  # Business logic: create incident, run analysis, build context
-├── requirements.txt
-├── Dockerfile
-└── .env.example
+backend/app/
+├── main.py              # FastAPI app factory, CORS, router registration, lifespan
+├── core/
+│   ├── config.py        # Pydantic Settings (env vars)
+│   ├── database.py      # async engine, AsyncSessionFactory, get_db, init_db
+│   └── auth.py          # JWT validation: _select_validator, _validate_supabase_token, _validate_dev_token, get_current_user
+├── routers/
+│   ├── incidents.py     # CRUD + /ai-actions + /reopen + deprecated /analyze
+│   ├── checklist.py     # PATCH /checklist/{id}
+│   ├── notes.py         # PUT /incidents/{id}/note
+│   ├── timeline.py      # GET /incidents/{id}/timeline
+│   ├── fix_flows.py     # PATCH /fix-flows/{id}/attempted
+│   ├── archive.py       # GET /archive
+│   ├── auth.py          # POST /auth/register (dev-only convenience)
+│   ├── ocr.py           # POST /ocr/extract-log
+│   └── dev.py           # POST /dev/token — conditionally registered only when ENABLE_DEV_AUTH=True (see sdd/auth/03_development.md)
+├── models/
+│   └── models.py        # SQLAlchemy ORM (all tables)
+├── schemas/
+│   └── incident.py      # All Pydantic request/response schemas
+├── services/
+│   ├── gemini_service.py     # Gemini API calls: extract_metadata(), generate()
+│   ├── incident_service.py   # Incident CRUD, compute_primary_action/secondary_actions
+│   └── ai_action_service.py  # request_action(), run_background(), create_system_action()
+└── ai_platform/
+    ├── registry.py           # REGISTRY dict, PRIORITY_ORDER list, get_handler()
+    ├── executor.py           # T1/T2 execution loop
+    ├── handlers/
+    │   ├── base.py                  # AIActionHandler ABC
+    │   ├── root_cause_analysis.py   # RootCauseAnalysisHandler (priority 10)
+    │   └── improved_fix_flow.py     # ImprovedFixFlowHandler (priority 20)
+    └── context/
+        ├── types.py          # Frozen dataclasses: CoreIncidentContext, etc.
+        └── builders.py       # Async context assembly functions
 ```
 
 ---
 
-## main.py Responsibilities
+## Layering Rules
+
+- **Routers:** validate input, call service, return response. Never call `gemini_service` or `executor` directly.
+- **incident_service:** owns incident CRUD + `compute_primary_action` + lifecycle hooks. Never calls executor.
+- **ai_action_service:** owns AIAction row creation and `run_background()` dispatch. Called by router.
+- **executor:** owns T1/T2 transaction boundary. Calls handlers. Opens its own sessions via `AsyncSessionFactory`.
+- **handlers:** own prompt construction, output parsing, result persistence per action type.
+- **gemini_service:** owns model calls and prompt templates. No DB access.
+
+All incident read/write checks `incident.user_id == current_user["user_id"]`, raises 403 otherwise.
+
+---
+
+## main.py
 
 ```python
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from app.routers import incidents, checklist, notes, timeline, fix_flows, archive
+from app.routers import incidents, checklist, notes, timeline, fix_flows, archive, auth, ocr
 
-def create_app() -> FastAPI:
-    app = FastAPI(title="Sentinel API", version="1.0.0")
-    app.add_middleware(CORSMiddleware,
-        allow_origins=settings.ALLOWED_ORIGINS,
-        allow_methods=["*"], allow_headers=["*"], allow_credentials=True)
-    app.include_router(incidents.router, prefix="/api/v1")
-    app.include_router(checklist.router, prefix="/api/v1")
-    app.include_router(notes.router, prefix="/api/v1")
-    app.include_router(timeline.router, prefix="/api/v1")
-    app.include_router(fix_flows.router, prefix="/api/v1")
-    app.include_router(archive.router, prefix="/api/v1")
+@asynccontextmanager
+async def lifespan(app):
+    if settings.resolved_database_url.startswith("sqlite"):
+        await init_db()   # dev only — PostgreSQL uses Alembic
+    yield
+
+def create_app():
+    app = FastAPI(title="Sentinel API", version="1.0.0", lifespan=lifespan)
+    app.add_middleware(CORSMiddleware, ...)
+    for r in [auth, incidents, checklist, notes, timeline, fix_flows, archive, ocr]:
+        app.include_router(r.router, prefix="/api/v1")
     return app
 ```
 
@@ -66,20 +83,19 @@ def create_app() -> FastAPI:
 ## core/config.py
 
 ```python
-from pydantic_settings import BaseSettings
-
 class Settings(BaseSettings):
-    DATABASE_URL: str           # postgresql+asyncpg://...
-    SUPABASE_JWT_SECRET: str
+    DATABASE_URL: str | None = None   # required in prod; omit for SQLite dev
+    SUPABASE_URL: str                 # used for JWKS endpoint
     GEMINI_API_KEY: str
     GEMINI_MODEL: str = "gemini-2.0-flash"
-    GEMINI_TIMEOUT_SECONDS: int = 15
+    ANALYSIS_TIMEOUT_SECONDS: int = 15
     ALLOWED_ORIGINS: list[str] = ["http://localhost:3000"]
+    APP_ENV: str = "development"
+    SKIP_EMAIL_VERIFICATION: bool = True
 
-    class Config:
-        env_file = ".env"
-
-settings = Settings()
+    @property
+    def resolved_database_url(self) -> str:
+        return self.DATABASE_URL or "sqlite+aiosqlite:///./sentinel_dev.db"
 ```
 
 ---
@@ -87,9 +103,7 @@ settings = Settings()
 ## core/database.py
 
 ```python
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
-
-engine = create_async_engine(settings.DATABASE_URL, echo=False)
+engine = create_async_engine(settings.resolved_database_url, echo=False)
 AsyncSessionFactory = async_sessionmaker(engine, expire_on_commit=False)
 
 async def get_db() -> AsyncSession:
@@ -97,51 +111,31 @@ async def get_db() -> AsyncSession:
         yield session
 ```
 
----
-
-## Router Pattern
-
-Every router uses the same dependency injection pattern:
-
-```python
-# routers/incidents.py
-from fastapi import APIRouter, Depends
-from app.core.auth import get_current_user
-from app.core.database import get_db
-
-router = APIRouter(tags=["incidents"])
-
-@router.post("/incidents", status_code=201)
-async def create_incident(
-    body: IncidentCreateRequest,
-    current_user: dict = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
-):
-    return await incident_service.create_and_analyze(body, current_user["user_id"], db)
-```
-
----
-
-## Service Layer Rules
-
-- Routers are thin: validate input, call service, return response
-- Services contain all business logic and DB queries
-- Gemini calls happen inside `incident_service.py`, which calls `gemini_service.py`
-- Services never import from routers
-- All DB operations use `async with db.begin()` for transaction safety
+`AsyncSessionFactory` is used directly by `executor.py` and `ai_action_service.create_system_action()` when they need sessions independent of the request lifecycle.
 
 ---
 
 ## incident_service.py Key Functions
 
 | Function | Responsibility |
-|----------|----------------|
-| `extract_metadata(log_text)` | Calls gemini; returns metadata dict |
-| `create_and_analyze(body, user_id, db)` | Creates incident, runs full AI analysis, stores all results |
-| `attach_fix_flow(incident_id, flow_id, user_id, db)` | Updates selected_fix_flow_id, sets status in_progress, adds timeline event |
-| `resolve_incident(incident_id, user_id, db)` | Sets status=resolved, resolved_at=now, adds timeline event |
-| `get_dashboard_incidents(user_id, db)` | Returns all non-closed incidents |
-| `get_archive_incidents(user_id, db)` | Returns resolved+closed incidents with computed resolution_time_minutes |
+|---|---|
+| `extract_metadata_for_display(log_text, db)` | Calls gemini; returns metadata dict (no DB write) |
+| `create_incident(body, user_id, db, origin_type)` | Creates Incident + initial AIAction row; returns `(incident_id, action_id)` |
+| `get_incident_detail(incident_id, user_id, db)` | Returns `IncidentResponse` with computed `primary_action`/`secondary_actions` |
+| `compute_primary_action(incident)` | Pure fn: iterates PRIORITY_ORDER, returns first matching handler's descriptor |
+| `compute_secondary_actions(incident)` | Pure fn: returns at most 2 secondary descriptors |
+| `patch_incident / resolve / reopen / close` | Lifecycle transitions + timeline events |
+| `_fire_lifecycle_hooks(event, incident_id)` | Calls `ai_action_service.create_system_action` for matching handlers |
+
+---
+
+## ai_action_service.py Key Functions
+
+| Function | Responsibility |
+|---|---|
+| `request_action(incident_id, action_type, user_id, db)` | Validates, creates AIAction row, returns `(action_id, attempt_number)` |
+| `run_background(action_id)` | Entry point for BackgroundTasks; delegates to executor |
+| `create_system_action(incident_id, action_type)` | Opens own session; used by lifecycle hooks |
 
 ---
 
@@ -151,9 +145,12 @@ async def create_incident(
 fastapi==0.115.x
 uvicorn[standard]==0.34.x
 sqlalchemy[asyncio]==2.0.x
-asyncpg==0.30.x
+aiosqlite==0.20.x          # dev SQLite driver
+asyncpg==0.30.x            # prod PostgreSQL driver
+alembic==1.13.x
 pydantic-settings==2.x
-python-jose[cryptography]==3.x
 google-generativeai==0.8.x
+PyJWKClient (PyJWT + cryptography)  # Supabase JWKS verification
 python-dotenv==1.x
+pillow / pytesseract        # OCR support
 ```

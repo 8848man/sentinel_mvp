@@ -178,18 +178,22 @@ class DashboardNotifier extends AsyncNotifier<DashboardState> {
 
 ## API Client (`core/api/api_client.dart`)
 
+Provider-agnostic — resolves the token through `AuthRepository`, never touches Supabase directly. Works unchanged across all three `AUTH_PROVIDER` modes (`supabase` / `dev` / `mock`). See [Auth Contract](../auth/01_contract.md) for `getAccessToken()` semantics per provider.
+
 ```dart
-// Dio instance with Supabase JWT interceptor
-final apiClient = Dio(BaseOptions(baseUrl: ApiEndpoints.base))
-  ..interceptors.add(InterceptorsWrapper(
+final apiClientProvider = Provider<Dio>((ref) {
+  final dio = Dio(BaseOptions(baseUrl: ApiEndpoints.base));
+  dio.interceptors.add(InterceptorsWrapper(
     onRequest: (options, handler) async {
-      final session = supabase.auth.currentSession;
-      if (session != null) {
-        options.headers['Authorization'] = 'Bearer ${session.accessToken}';
+      final token = await ref.read(authRepositoryProvider).getAccessToken();
+      if (token != null) {
+        options.headers['Authorization'] = 'Bearer $token';
       }
       handler.next(options);
     },
   ));
+  return dio;
+});
 ```
 
 ---

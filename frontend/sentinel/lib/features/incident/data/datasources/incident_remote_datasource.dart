@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import '../mocks/mock_incidents.dart';
 import '../models/incident_metadata_model.dart';
 import '../models/incident_model.dart';
@@ -5,14 +7,30 @@ import '../models/fix_flow_model.dart';
 import '../models/checklist_item_model.dart';
 import '../models/timeline_event_model.dart';
 import '../models/note_model.dart';
+import '../models/ocr_extraction_result_model.dart';
 import 'incident_datasource.dart';
 
 class IncidentRemoteDatasource implements IncidentDatasource {
   // In-memory mutable copy so UI mutations (checklist, notes, resolve) persist
   // within a single app session.
-  // In-memory mutable copy so UI mutations (checklist, notes, resolve) persist
-  // within a single app session.
   final List<IncidentModel> _store = List.of(kMockIncidents);
+
+  // ── POST /ocr/extract-log ────────────────────────────────────────────────────
+
+  Future<OcrExtractionResultModel> extractLogFromImage(
+    Uint8List imageBytes,
+    String filename,
+  ) async {
+    await Future.delayed(const Duration(milliseconds: 1200));
+    return OcrExtractionResultModel.fromJson({
+      'ocr_status': 'ok',
+      'ocr_text': '[mock] ERROR: connection refused at 10:42:03 — '
+          'mock OCR output for "$filename" (${imageBytes.length} bytes)',
+      'cleaned_text': '[mock] ERROR: connection refused at 10:42:03',
+      'cleanup_status': 'ok',
+      'warnings': <String>[],
+    });
+  }
 
   // ── POST /incidents/analyze-metadata ──────────────────────────────────────
 

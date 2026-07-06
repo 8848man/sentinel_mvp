@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import get_db, init_db
-from app.routers import incidents, checklist, notes, timeline, fix_flows, archive, auth
+from app.routers import incidents, checklist, notes, timeline, fix_flows, archive, auth, ocr
 
 
 @asynccontextmanager
@@ -43,6 +43,13 @@ def create_app() -> FastAPI:
     app.include_router(timeline.router,   prefix="/api/v1")
     app.include_router(fix_flows.router,  prefix="/api/v1")
     app.include_router(archive.router,    prefix="/api/v1")
+    app.include_router(ocr.router,        prefix="/api/v1")
+
+    # Dev router: registered only when ENABLE_DEV_AUTH is True.
+    # When disabled, POST /api/v1/dev/token does not exist (404, not 403).
+    if settings.ENABLE_DEV_AUTH:
+        from app.routers import dev  # noqa: PLC0415
+        app.include_router(dev.router, prefix="/api/v1")
 
     # ── Health endpoints ──────────────────────────────────────────────────────
 

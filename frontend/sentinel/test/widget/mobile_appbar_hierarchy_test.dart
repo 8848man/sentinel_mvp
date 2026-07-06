@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -6,6 +8,7 @@ import 'package:sentinel/features/incident/domain/entities/incident.dart';
 import 'package:sentinel/features/incident/domain/entities/incident_metadata.dart';
 import 'package:sentinel/features/incident/domain/entities/note.dart';
 import 'package:sentinel/features/incident/domain/entities/checklist_item.dart';
+import 'package:sentinel/features/incident/domain/entities/ocr_extraction_result.dart';
 import 'package:sentinel/features/incident/domain/repositories/incident_repository.dart';
 import 'package:sentinel/features/incident/domain/usecases/get_incident_detail.dart';
 import 'package:sentinel/features/incident/presentation/analysis/screens/analysis_screen.dart';
@@ -32,6 +35,10 @@ class _FakeIncidentRepository implements IncidentRepository {
 
   @override
   Future<IncidentMetadata> analyzeMetadata(String rawLog) =>
+      throw UnimplementedError();
+  @override
+  Future<OcrExtractionResult> extractLogFromImage(
+          Uint8List imageBytes, String filename) =>
       throw UnimplementedError();
   @override
   Future<Incident> createIncident({

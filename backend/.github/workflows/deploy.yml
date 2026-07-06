@@ -29,7 +29,6 @@
 #   DATABASE_URL              postgresql+asyncpg:// transaction-pooler URL
 #   MIGRATION_DATABASE_URL    postgresql:// direct-connection URL (port 5432)
 #   SUPABASE_URL              https://<ref>.supabase.co
-#   SUPABASE_JWT_SECRET       Supabase project JWT secret
 #   GEMINI_API_KEY            Google AI Studio API key
 #
 # See docs/deployment.md for first-time GCP setup instructions.
@@ -174,7 +173,6 @@ jobs:
             --set-secrets "\
           DATABASE_URL=DATABASE_URL:latest,\
           SUPABASE_URL=SUPABASE_URL:latest,\
-          SUPABASE_JWT_SECRET=SUPABASE_JWT_SECRET:latest,\
           GEMINI_API_KEY=GEMINI_API_KEY:latest" \
             --allow-unauthenticated \
             --min-instances  0 \

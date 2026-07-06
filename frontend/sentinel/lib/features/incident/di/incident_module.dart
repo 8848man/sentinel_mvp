@@ -7,6 +7,7 @@ import '../data/datasources/incident_api_datasource.dart';
 import '../data/repositories/incident_repository_impl.dart';
 import '../domain/repositories/incident_repository.dart';
 import '../domain/usecases/analyze_incident_metadata.dart';
+import '../domain/usecases/extract_log_from_image.dart';
 import '../domain/usecases/create_incident.dart';
 import '../domain/usecases/get_incidents.dart';
 import '../domain/usecases/get_incident_detail.dart';
@@ -33,6 +34,10 @@ final incidentRepositoryProvider = Provider<IncidentRepository>(
 
 final analyzeMetadataUseCaseProvider = Provider<AnalyzeIncidentMetadata>(
   (ref) => AnalyzeIncidentMetadata(ref.watch(incidentRepositoryProvider)),
+);
+
+final extractLogFromImageUseCaseProvider = Provider<ExtractLogFromImage>(
+  (ref) => ExtractLogFromImage(ref.watch(incidentRepositoryProvider)),
 );
 
 final createIncidentUseCaseProvider = Provider<CreateIncident>(

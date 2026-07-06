@@ -1,0 +1,4 @@
+# Enforce LF line endings for shell scripts in all environments.
+# Windows git autocrlf would otherwise check out .sh files with CRLF,
+# which breaks the Linux container shebang (#!/bin/sh\r → interpreter not found).
+*.sh text eol=lf

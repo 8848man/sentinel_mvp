@@ -1,7 +1,7 @@
 # 11 — Deployment Specification
 
 **Cloud:** Google Cloud Platform (GCP)  
-**Refs:** → [Backend Architecture](../backend/09_backend_arch.md) · [Database Schema](../backend/06_database_schema.md)
+**Refs:** → [Backend Architecture](../backend/09_backend_arch.md) · [Database Schema](../backend/06_database_schema.md) · [Production Auth](../auth/02_production.md)
 
 ---
 
@@ -12,7 +12,7 @@
 | Backend API | Cloud Run | Containerized FastAPI, auto-scales to zero |
 | Frontend | Firebase Hosting | Flutter web build, CDN-served |
 | Database | Cloud SQL (PostgreSQL 16) | Managed PostgreSQL, private IP |
-| Secrets | Secret Manager | API keys, DB credentials, JWT secret |
+| Secrets | Secret Manager | API keys, DB credentials |
 | CI/CD | Cloud Build | Automated build + deploy on git push |
 | Logs | Cloud Logging | All backend logs |
 | Container Registry | Artifact Registry | Docker images |
@@ -50,15 +50,28 @@ spec:
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef: { name: sentinel-db-url, version: latest }
-            - name: SUPABASE_JWT_SECRET
+            - name: SUPABASE_URL
               valueFrom:
-                secretKeyRef: { name: sentinel-supabase-jwt, version: latest }
+                secretKeyRef: { name: sentinel-supabase-url, version: latest }
             - name: GEMINI_API_KEY
               valueFrom:
                 secretKeyRef: { name: sentinel-gemini-key, version: latest }
           resources:
             limits: { memory: 512Mi, cpu: "1" }
 ```
+
+---
+
+## Authentication (ES256 / JWKS)
+
+The backend verifies JWTs using Supabase's JWKS endpoint. No shared secret is used.
+
+- **Algorithm:** ES256 (not HS256)
+- **Key source:** `{SUPABASE_URL}/auth/v1/.well-known/jwks.json` — fetched at startup via `PyJWKClient`
+- **Required env var:** `SUPABASE_URL` — used to derive the JWKS URL at runtime
+- **No `SUPABASE_JWT_SECRET`** — this variable does not exist in the backend. Do not provision it.
+
+See [Production Auth](../auth/02_production.md) for the verification implementation.
 
 ---
 
@@ -87,23 +100,68 @@ CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080", "--worker
 - **DATABASE_URL format:** `postgresql+asyncpg://user:pass@/dbname?host=/cloudsql/PROJECT:REGION:INSTANCE`
 - **Backups:** Automated daily backups, 7-day retention
 
-**Initial setup:**
+**Initial schema setup (PostgreSQL):**
 ```bash
-gcloud sql connect sentinel-db --user=postgres
-# Run: /database/migrations/001_initial_schema.sql
+# Configure DATABASE_URL pointing to Cloud SQL instance, then:
+cd backend
+alembic upgrade head
 ```
+
+Migrations are located at `backend/alembic/versions/`. Never run `init_db()` against PostgreSQL — it is for SQLite dev only.
 
 ---
 
 ## Frontend: Firebase Hosting
 
-```bash
-# Build Flutter web
-flutter build web --release
+**Deployments must go through `scripts/deploy_web.sh` — never invoke `flutter build web` / `firebase deploy` by hand.** The script is the single source of truth for which `--dart-define` flags a deploy needs; hand-typed commands are how `SUPABASE_URL`/`SUPABASE_ANON_KEY` get forgotten and ship an app that initializes Supabase with an empty URL (see [Auth Overview](../auth/00_overview.md) for the failure mode this causes at sign-in).
 
-# Deploy
-firebase deploy --only hosting
+### Deployment architecture
+
 ```
+developer / CI runner
+       │
+       │  SUPABASE_URL, SUPABASE_ANON_KEY, API_BASE_URL (env vars or scripts/.env.<environment>)
+       ▼
+scripts/deploy_web.sh <production|staging>
+       │
+       ├── 1. flutter build web --release --dart-define=... (frontend/sentinel)
+       └── 2. firebase deploy --only hosting --project <project>
+                      │
+                      ▼
+              Firebase Hosting (CDN) ── frontend/sentinel/firebase.json, .firebaserc
+```
+
+### Required environment variables (script inputs)
+
+| Variable | Required for | Purpose |
+|----------|--------------|---------|
+| `SUPABASE_URL` | `production` | Supabase project URL baked into the build via `--dart-define` |
+| `SUPABASE_ANON_KEY` | `production` | Supabase anon key baked into the build via `--dart-define` |
+| `API_BASE_URL` | `production` | Backend Cloud Run URL baked into the build via `--dart-define` |
+| `FIREBASE_PROJECT` | optional | Overrides the default Firebase project (`sentinel-mvp-eeeee`) |
+
+The script fails immediately with a readable error if a required variable is missing — it never proceeds to `flutter build` with a blank value. Values may also be supplied via a local, gitignored `scripts/.env.production` (or `.env.staging`) file, which the script sources automatically if present.
+
+### Deployment workflow
+
+```bash
+# One-time: authenticate the Firebase CLI
+firebase login
+
+# Production deploy
+SUPABASE_URL=https://<project>.supabase.co \
+SUPABASE_ANON_KEY=<anon-key> \
+API_BASE_URL=https://sentinel-backend-<hash>-an.a.run.app \
+./scripts/deploy_web.sh production
+```
+
+`AUTH_PROVIDER=supabase`, `USE_MOCK_DATA=false`, and `SKIP_EMAIL_VERIFICATION=false` are hardcoded into the script's `production` case — a production deploy can never accidentally ship with mock data or the dev auth provider active.
+
+**Staging** is stubbed in the script (`scripts/deploy_web.sh`, `staging` case) and exits with an explanatory error until a staging Supabase project + Cloud Run backend exist. To enable it: provision those resources, then fill in the staging branch (mirrors the `production` case) and set the corresponding variables via `scripts/.env.staging` or CI substitutions.
+
+### CI (Cloud Build)
+
+`deployment/cloudbuild.yaml`'s `frontend-build` step passes the same three "hardening" defines (`AUTH_PROVIDER=supabase`, `USE_MOCK_DATA=false`, `SKIP_EMAIL_VERIFICATION=false`) directly as `flutter build web` args, since Cloud Build steps run in per-tool containers (a `flutter` image, then a separate `firebase` image) and can't invoke the bash script as a single unit the way a local/production deploy can. Keep these two flows in parity by hand if either one's dart-define list changes.
 
 **firebase.json:**
 ```json
@@ -165,18 +223,35 @@ substitutions:
 
 ---
 
-## Environment Variables Summary
+## Environment Variables
 
-| Variable | Source | Used By |
-|----------|--------|---------|
-| `DATABASE_URL` | Secret Manager | Backend |
-| `SUPABASE_JWT_SECRET` | Secret Manager | Backend |
-| `GEMINI_API_KEY` | Secret Manager | Backend |
-| `SUPABASE_URL` | Flutter dart-defines | Frontend |
-| `SUPABASE_ANON_KEY` | Flutter dart-defines | Frontend |
-| `API_BASE_URL` | Flutter dart-defines | Frontend |
+### Backend (Secret Manager)
 
-Flutter env vars are injected at build time via `--dart-define`:
-```bash
-flutter build web --dart-define=SUPABASE_URL=xxx --dart-define=API_BASE_URL=yyy
-```
+| Variable | Secret Manager name | Purpose |
+|----------|--------------------|---------| 
+| `DATABASE_URL` | `sentinel-db-url` | PostgreSQL connection string (required in prod) |
+| `SUPABASE_URL` | `sentinel-supabase-url` | Supabase project URL; used to derive JWKS endpoint |
+| `GEMINI_API_KEY` | `sentinel-gemini-key` | Gemini API authentication |
+
+### Backend (optional env vars, set directly on Cloud Run service)
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `GEMINI_MODEL` | `gemini-2.0-flash` | Model override |
+| `ANALYSIS_TIMEOUT_SECONDS` | `15` | Gemini call timeout |
+| `ALLOWED_ORIGINS` | `["http://localhost:3000"]` | CORS allowed origins — set to production frontend URL |
+| `APP_ENV` | `development` | Environment label |
+| `SKIP_EMAIL_VERIFICATION` | `True` | Set `False` in production to disable dev-only register endpoint |
+
+### Flutter (--dart-define at build time)
+
+| Variable | Purpose |
+|----------|---------|
+| `AUTH_PROVIDER` | `supabase` (default) \| `mock` \| `dev`. Must be `supabase` in production — see [Auth Overview](../auth/00_overview.md) |
+| `SUPABASE_URL` | Supabase project URL for Flutter Supabase SDK. Required when `AUTH_PROVIDER=supabase`; `AppConfig.validate()` in `main.dart` throws a readable `StateError` at startup if missing instead of letting the SDK initialize with an empty URL |
+| `SUPABASE_ANON_KEY` | Supabase anon key for Flutter Supabase SDK. Same fail-fast behavior as `SUPABASE_URL` |
+| `API_BASE_URL` | Backend Cloud Run URL |
+| `USE_MOCK_DATA` | Must be `false` in production (defaults to `true`) |
+| `SKIP_EMAIL_VERIFICATION` | Must be `false` in production (defaults to `true`) |
+
+`scripts/deploy_web.sh` sets all of these correctly for `production`; do not pass them by hand.

@@ -1,26 +1,18 @@
 # 06 — Database Schema
 
-**DB:** PostgreSQL (GCP Cloud SQL)  
+**DB:** PostgreSQL (GCP Cloud SQL, via Alembic migrations)  
+**Dev:** SQLite (auto-created from ORM models on startup — no migrations needed)  
 **Refs:** → [API Spec](./05_api_spec.md) · [Auth Spec](./07_auth_spec.md)
 
 ---
 
 ## Design Principles
 
-- `user_id` on every table references Supabase `auth.users(id)` — RLS can be layered later
-- All PKs are `UUID DEFAULT gen_random_uuid()`
-- All timestamps are `TIMESTAMPTZ` (UTC)
-- Soft delete not used in MVP; resolved incidents transition to `closed` status
+- All PKs: `UUID DEFAULT gen_random_uuid()`
+- All timestamps: `TIMESTAMPTZ` (UTC) — standardized by migration `c4e1f9a03b72` (see Migrations below); all tables have been on `TIMESTAMPTZ` since that migration
+- `user_id` on every table references Supabase `auth.users(id)`
 - `incident_code` is human-readable (`INC-YYYY-NNN`); `id` is the internal UUID
-
----
-
-## Enums
-
-```sql
-CREATE TYPE severity_level AS ENUM ('critical', 'major', 'minor');
-CREATE TYPE incident_status AS ENUM ('open', 'in_progress', 'resolved', 'closed');
-```
+- Alembic manages all schema changes for PostgreSQL (`backend/alembic/versions/`)
 
 ---
 
@@ -30,41 +22,76 @@ CREATE TYPE incident_status AS ENUM ('open', 'in_progress', 'resolved', 'closed'
 CREATE TABLE incidents (
   id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id               UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  incident_code         VARCHAR(20) NOT NULL UNIQUE,  -- INC-2026-043
+  incident_code         VARCHAR(20) NOT NULL UNIQUE,
   title                 VARCHAR(255) NOT NULL,
-  description           TEXT,                          -- AI-generated short summary
-  log_text              TEXT NOT NULL,                 -- original user-provided log
-  severity              severity_level NOT NULL,
-  status                incident_status NOT NULL DEFAULT 'open',
-  components            TEXT[] NOT NULL DEFAULT '{}',  -- architecture component names
-  root_cause            TEXT,                          -- AI-generated
-  confidence            NUMERIC(4,3),                  -- 0.000 – 1.000
-  selected_fix_flow_id  UUID,                          -- FK set after fix flow chosen
+  description           TEXT,
+  log_text              TEXT NOT NULL,
+  severity              VARCHAR(20) NOT NULL,
+  status                VARCHAR(20) NOT NULL DEFAULT 'open',
+  components            JSONB NOT NULL DEFAULT '[]',
+  root_cause            TEXT,
+  confidence            NUMERIC(4,3),
+  selected_fix_flow_id  UUID,
+  analysis_status       VARCHAR(20) NOT NULL DEFAULT 'pending',
+  analysis_error        TEXT,
+  origin_type           VARCHAR(50),
   resolved_at           TIMESTAMPTZ,
   created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-
-CREATE INDEX idx_incidents_user_id ON incidents(user_id);
-CREATE INDEX idx_incidents_status  ON incidents(status);
-CREATE INDEX idx_incidents_severity ON incidents(severity);
 ```
+
+`analysis_status`: `pending` | `processing` | `completed` | `failed` — denormalized cache from latest AIAction.  
+`origin_type`: `manual_text` | `ocr_image` | `webhook` | `null` — forward-compat hook for the Origin concept.
 
 ---
 
 ## Table: incident_sequence
 
-Tracks the per-year auto-increment sequence for `INC-YYYY-NNN` codes.
-
 ```sql
 CREATE TABLE incident_sequence (
-  year    SMALLINT PRIMARY KEY,
+  year     SMALLINT PRIMARY KEY,
   next_seq INTEGER NOT NULL DEFAULT 1
 );
 ```
 
-**Usage:** On incident creation, `SELECT ... FOR UPDATE` on current year row,  
-increment `next_seq`, compose `incident_code = 'INC-' || year || '-' || LPAD(seq::text, 3, '0')`.
+Usage: `SELECT ... FOR UPDATE` on current year row, increment, compose `INC-{year}-{seq:03d}`.
+
+---
+
+## Table: ai_actions
+
+Tracks every AI action request and its result. Replaces the legacy `analysis_jobs` table.
+
+```sql
+CREATE TABLE ai_actions (
+  id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  incident_id           UUID NOT NULL REFERENCES incidents(id) ON DELETE CASCADE,
+  action_type           VARCHAR(100) NOT NULL DEFAULT 'root_cause_analysis',
+  requested_by          VARCHAR(20) NOT NULL DEFAULT 'system',
+  status                VARCHAR(20) NOT NULL DEFAULT 'pending',
+  attempt_number        INTEGER NOT NULL DEFAULT 1,
+  input_snapshot        JSONB,
+  output                JSONB,
+  output_schema_version VARCHAR(20),
+  model_id              VARCHAR(100),
+  parent_action_id      UUID REFERENCES ai_actions(id),
+  error_message         TEXT,
+  started_at            TIMESTAMPTZ,
+  completed_at          TIMESTAMPTZ,
+  created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_ai_actions_incident_id ON ai_actions(incident_id);
+CREATE UNIQUE INDEX uix_ai_actions_incident_active
+  ON ai_actions(incident_id)
+  WHERE status IN ('pending', 'processing');
+```
+
+`requested_by`: `system` | `operator`  
+`status`: `pending` | `processing` | `completed` | `failed`  
+`input_snapshot`: metadata captured at T1 (char counts, origin_type, similar_incident_count, etc.)  
+Partial unique index enforces at most one active action per incident.
 
 ---
 
@@ -74,19 +101,17 @@ increment `next_seq`, compose `incident_code = 'INC-' || year || '-' || LPAD(seq
 CREATE TABLE timeline_events (
   id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   incident_id  UUID NOT NULL REFERENCES incidents(id) ON DELETE CASCADE,
+  actor_type   VARCHAR(20) NOT NULL DEFAULT 'system',
+  event_type   VARCHAR(100),
   event        TEXT NOT NULL,
+  ai_action_id UUID REFERENCES ai_actions(id),
+  metadata     JSONB,
   occurred_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-
-CREATE INDEX idx_timeline_incident_id ON timeline_events(incident_id);
 ```
 
-**System-generated events (backend writes these automatically):**
-- `"Alert triggered"` — on incident creation
-- `"AI analysis completed"` — after Gemini response stored
-- `"Fix Flow attached: {flow_title}"` — when fix flow selected
-- `"Step '{step}' completed"` — when checklist item checked
-- `"Incident resolved"` — on Mark as Resolved
+`actor_type`: `system` | `operator` | `ai`  
+Common `event_type` values: `incident_created`, `ai_action_queued`, `ai_action_completed`, `fix_flow_selected`, `fix_flow_attempted`, `checklist_step_completed`, `incident_resolved`, `incident_reopened`, `incident_closed`
 
 ---
 
@@ -94,27 +119,20 @@ CREATE INDEX idx_timeline_incident_id ON timeline_events(incident_id);
 
 ```sql
 CREATE TABLE fix_flows (
-  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  incident_id  UUID NOT NULL REFERENCES incidents(id) ON DELETE CASCADE,
-  title        VARCHAR(255) NOT NULL,
-  confidence   NUMERIC(4,3) NOT NULL,   -- 0.000 – 1.000
-  is_attempted BOOLEAN NOT NULL DEFAULT FALSE,
-  sort_order   SMALLINT NOT NULL DEFAULT 0,  -- display order (confidence DESC)
-  created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  incident_id      UUID NOT NULL REFERENCES incidents(id) ON DELETE CASCADE,
+  source_action_id UUID REFERENCES ai_actions(id),
+  title            VARCHAR(255) NOT NULL,
+  confidence       NUMERIC(4,3) NOT NULL,
+  is_attempted     BOOLEAN NOT NULL DEFAULT FALSE,
+  generation       SMALLINT NOT NULL DEFAULT 1,
+  sort_order       SMALLINT NOT NULL DEFAULT 0,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-
-CREATE INDEX idx_fix_flows_incident_id ON fix_flows(incident_id);
 ```
 
-**FK back-reference:**  
-`incidents.selected_fix_flow_id` → `fix_flows.id` (set after user selects a flow)  
-Add FK after both tables created:
-
-```sql
-ALTER TABLE incidents
-  ADD CONSTRAINT fk_selected_fix_flow
-  FOREIGN KEY (selected_fix_flow_id) REFERENCES fix_flows(id) ON DELETE SET NULL;
-```
+`generation`: 1 = initial analysis, N+1 = improved analysis. Old generations are never deleted.  
+`source_action_id`: links to the AIAction that produced this flow.
 
 ---
 
@@ -129,8 +147,6 @@ CREATE TABLE checklist_items (
   is_completed BOOLEAN NOT NULL DEFAULT FALSE,
   updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-
-CREATE INDEX idx_checklist_fix_flow_id ON checklist_items(fix_flow_id);
 ```
 
 ---
@@ -141,87 +157,49 @@ One note per incident (upsert pattern).
 
 ```sql
 CREATE TABLE notes (
-  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  incident_id  UUID NOT NULL UNIQUE REFERENCES incidents(id) ON DELETE CASCADE,
-  content      TEXT NOT NULL DEFAULT '',
-  updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  incident_id UUID NOT NULL UNIQUE REFERENCES incidents(id) ON DELETE CASCADE,
+  content     TEXT NOT NULL DEFAULT '',
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-```
-
-**Upsert query (PUT /incidents/{id}/note):**
-```sql
-INSERT INTO notes (incident_id, content, updated_at)
-VALUES ($1, $2, NOW())
-ON CONFLICT (incident_id)
-DO UPDATE SET content = EXCLUDED.content, updated_at = NOW();
 ```
 
 ---
 
 ## Table: similar_incidents
 
-Stores AI-identified similar incidents at analysis time.
-
 ```sql
 CREATE TABLE similar_incidents (
-  id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  incident_id        UUID NOT NULL REFERENCES incidents(id) ON DELETE CASCADE,
-  similar_to_id      UUID NOT NULL REFERENCES incidents(id) ON DELETE CASCADE,
-  match_score        NUMERIC(4,3) NOT NULL,   -- 0.000 – 1.000
-  created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  incident_id   UUID NOT NULL REFERENCES incidents(id) ON DELETE CASCADE,
+  similar_to_id UUID NOT NULL REFERENCES incidents(id) ON DELETE CASCADE,
+  match_score   NUMERIC(4,3) NOT NULL,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE(incident_id, similar_to_id)
 );
-
-CREATE INDEX idx_similar_incident_id ON similar_incidents(incident_id);
 ```
 
 ---
 
-## Updated_at Trigger
-
-Apply to `incidents` and `checklist_items`:
+## FK: incidents.selected_fix_flow_id
 
 ```sql
-CREATE OR REPLACE FUNCTION set_updated_at()
-RETURNS TRIGGER AS $$
-BEGIN
-  NEW.updated_at = NOW();
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER trg_incidents_updated_at
-  BEFORE UPDATE ON incidents
-  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-
-CREATE TRIGGER trg_checklist_updated_at
-  BEFORE UPDATE ON checklist_items
-  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+ALTER TABLE incidents
+  ADD CONSTRAINT fk_selected_fix_flow
+  FOREIGN KEY (selected_fix_flow_id) REFERENCES fix_flows(id) ON DELETE SET NULL;
 ```
 
 ---
 
-## Computed Field: resolution_time_minutes
+## Migrations
 
-Not stored; calculated on query:
+Located at: `backend/alembic/versions/`. Full chain in order (verified against `revision`/`down_revision` in each file):
 
-```sql
-SELECT
-  EXTRACT(EPOCH FROM (resolved_at - created_at)) / 60 AS resolution_time_minutes
-FROM incidents
-WHERE status IN ('resolved', 'closed');
-```
+1. `ade19d24d3c8_initial_schema` — base schema (incidents, fix_flows, checklist, notes, timeline, similar_incidents)
+2. `05fac983b5ee_first_alembic_push` — initial Alembic baseline push
+3. `ed6aa6c2270c_` — autogenerated, no message recorded
+4. `c4e1f9a03b72_convert_timestamps_to_timestamptz` — converts all timestamp columns to `TIMESTAMPTZ`
+5. `a1b2c3d4e5f6_add_analysis_jobs` — adds the (now-renamed) `analysis_jobs` table and incident analysis fields
+6. `b2c3d4e5f6a7_ai_platform_foundation` — **head**. Renames `analysis_jobs` → `ai_actions`; extends `incidents`, `timeline_events`, `fix_flows`; adds `origin_type`
 
----
-
-## Row-Level Security (MVP: disabled; future)
-
-Supabase RLS policies should be added post-MVP to enforce `user_id` ownership  
-at the database level. For MVP, ownership is enforced in FastAPI service layer.
-
----
-
-## Migration File
-
-Located at: `/database/migrations/001_initial_schema.sql`  
-Contains all `CREATE TYPE`, `CREATE TABLE`, `ALTER TABLE`, trigger definitions above, in dependency order.
+Run `alembic history` against a live database to confirm current head if this list and the repository diverge again.
